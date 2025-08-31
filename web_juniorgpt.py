@@ -1890,15 +1890,27 @@ HTML_TEMPLATE = '''
                 artifactsHtml += '</div>';
             }
             
-            // Format content with proper code block rendering
+            // Format content with proper code block rendering and text structure
             let formattedContent = content || '';
             
-            // Convert markdown code blocks to proper HTML
+            // First, extract code blocks and replace with placeholders
+            const codeBlocks = [];
+            let codeBlockIndex = 0;
+            
             formattedContent = formattedContent.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
                 const language = lang || 'text';
-                return `<pre class="code-block"><code class="language-${language}">${code.trim()}</code></pre>`;
+                const blockId = `CODE_BLOCK_${codeBlockIndex}`;
+                codeBlocks.push({
+                    id: blockId,
+                    language: language,
+                    code: code.trim(),
+                    fullMatch: match
+                });
+                codeBlockIndex++;
+                return blockId;
             });
             
+            // Format regular text content
             // Convert inline code
             formattedContent = formattedContent.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
             
@@ -1911,8 +1923,30 @@ HTML_TEMPLATE = '''
             formattedContent = formattedContent.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
             formattedContent = formattedContent.replace(/\*(.*?)\*/g, '<em>$1</em>');
             
-            // Convert line breaks
+            // Convert line breaks to proper paragraphs
+            formattedContent = formattedContent.replace(/\n\n/g, '</p><p>');
             formattedContent = formattedContent.replace(/\n/g, '<br>');
+            
+            // Wrap in paragraph tags if not already wrapped
+            if (!formattedContent.startsWith('<h') && !formattedContent.startsWith('<p>')) {
+                formattedContent = '<p>' + formattedContent + '</p>';
+            }
+            
+            // Replace code block placeholders with properly formatted HTML
+            codeBlocks.forEach(block => {
+                const codeBlockHtml = `
+                    <div class="code-block-container">
+                        <div class="code-block-header">
+                            <span class="code-language">${block.language}</span>
+                            <button class="copy-code-button" onclick="copyCodeBlock(this, \`${block.code.replace(/`/g, '\\\\`').replace(/\$/g, '\\\\$')}\`)">
+                                📋 Copy
+                            </button>
+                        </div>
+                        <pre class="code-block"><code class="language-${block.language}">${block.code}</code></pre>
+                    </div>
+                `;
+                formattedContent = formattedContent.replace(block.id, codeBlockHtml);
+            });
             
             messageDiv.innerHTML = `
                 <div class="message-avatar ${avatarClass}">${avatar}</div>
@@ -2122,6 +2156,28 @@ HTML_TEMPLATE = '''
             }).catch(function(err) {
                 console.error('Failed to copy: ', err);
                 alert('Failed to copy to clipboard');
+            });
+        }
+        
+        // Copy code block function
+        function copyCodeBlock(button, code) {
+            navigator.clipboard.writeText(code).then(function() {
+                // Change button text temporarily
+                const originalText = button.innerHTML;
+                button.innerHTML = '✅ Copied!';
+                button.classList.add('copied');
+                
+                // Reset after 2 seconds
+                setTimeout(function() {
+                    button.innerHTML = originalText;
+                    button.classList.remove('copied');
+                }, 2000);
+            }).catch(function(err) {
+                console.error('Failed to copy code: ', err);
+                button.innerHTML = '❌ Failed';
+                setTimeout(function() {
+                    button.innerHTML = originalText;
+                }, 2000);
             });
         }
         
@@ -3072,13 +3128,73 @@ def styles_css():
         margin-bottom: 0;
     }
     
+    .message-text p {
+        margin: 0 0 16px 0;
+        line-height: 1.6;
+        color: #ffffff;
+    }
+    
+    .message-text p:last-child {
+        margin-bottom: 0;
+    }
+    
+    .message-text p:first-child {
+        margin-top: 0;
+    }
+    
     /* Code Block Styling */
-    .code-block {
-        background: #1e1e1e;
+    .code-block-container {
+        margin: 16px 0;
         border: 1px solid #404040;
         border-radius: 8px;
+        overflow: hidden;
+        background: #1e1e1e;
+    }
+    
+    .code-block-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 16px;
+        background: #2d2d2d;
+        border-bottom: 1px solid #404040;
+        font-size: 12px;
+        font-weight: 500;
+    }
+    
+    .code-language {
+        color: #888888;
+        text-transform: uppercase;
+        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    }
+    
+    .copy-code-button {
+        background: #404040;
+        border: none;
+        border-radius: 4px;
+        padding: 4px 8px;
+        color: #ffffff;
+        cursor: pointer;
+        font-size: 11px;
+        font-family: inherit;
+        transition: background 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+    
+    .copy-code-button:hover {
+        background: #505050;
+    }
+    
+    .copy-code-button.copied {
+        background: #34C759;
+    }
+    
+    .code-block {
+        background: #1e1e1e;
         padding: 16px;
-        margin: 12px 0;
+        margin: 0;
         overflow-x: auto;
         font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
         font-size: 14px;
