@@ -391,18 +391,24 @@ class ResearchAgent(BaseAgent):
         research_indicators = [
             "research", "investigate", "find information", "look up",
             "what is", "tell me about", "explain", "analyze",
-            "fact check", "verify", "sources", "evidence"
+            "fact check", "verify", "sources", "evidence",
+            "study", "survey", "summary", "background",
+            "statistics", "data", "report"
         ]
-        
+
         for indicator in research_indicators:
             if indicator in message_lower:
                 base_score += 0.3
-        
+
         # Question words indicate research need
         question_words = ["what", "why", "how", "when", "where", "who", "which"]
         if any(word in message_lower.split()[:3] for word in question_words):
             base_score += 0.2
-        
+
+        # Presence of a question mark suggests informational intent
+        if "?" in message:
+            base_score += 0.1
+
         return min(base_score, 1.0)
 
 # Standalone execution capability
