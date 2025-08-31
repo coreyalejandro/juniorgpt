@@ -1890,11 +1890,35 @@ HTML_TEMPLATE = '''
                 artifactsHtml += '</div>';
             }
             
+            // Format content with proper code block rendering
+            let formattedContent = content || '';
+            
+            // Convert markdown code blocks to proper HTML
+            formattedContent = formattedContent.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
+                const language = lang || 'text';
+                return `<pre class="code-block"><code class="language-${language}">${code.trim()}</code></pre>`;
+            });
+            
+            // Convert inline code
+            formattedContent = formattedContent.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
+            
+            // Convert markdown headers
+            formattedContent = formattedContent.replace(/^### (.*$)/gm, '<h3>$1</h3>');
+            formattedContent = formattedContent.replace(/^## (.*$)/gm, '<h2>$1</h2>');
+            formattedContent = formattedContent.replace(/^# (.*$)/gm, '<h1>$1</h1>');
+            
+            // Convert bold and italic
+            formattedContent = formattedContent.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            formattedContent = formattedContent.replace(/\*(.*?)\*/g, '<em>$1</em>');
+            
+            // Convert line breaks
+            formattedContent = formattedContent.replace(/\n/g, '<br>');
+            
             messageDiv.innerHTML = `
                 <div class="message-avatar ${avatarClass}">${avatar}</div>
                 <div class="message-content">
                     ${agentIndicator}
-                    <p>${content || ''}</p>
+                    <div class="message-text">${formattedContent}</div>
                     ${attachmentsHtml}
                     ${artifactsHtml}
                     ${copyButton}
@@ -2962,6 +2986,384 @@ def delete_artifact(artifact_id):
     except Exception as e:
         logger.error(f"Error deleting artifact {artifact_id}: {e}")
         return jsonify({'error': 'Failed to delete artifact'}), 500
+
+@app.route('/styles.css')
+def styles_css():
+    """Serve the main CSS file with proper code block styling"""
+    css_content = """
+    /* Main Styles */
+    body {
+        margin: 0;
+        padding: 0;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background: #1a1a1a;
+        color: #ffffff;
+        line-height: 1.6;
+    }
+    
+    /* Chat Interface */
+    .chat-container {
+        display: flex;
+        height: 100vh;
+        background: #1a1a1a;
+    }
+    
+    .sidebar {
+        width: 300px;
+        background: #2d2d2d;
+        border-right: 1px solid #404040;
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .main-content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        background: #1a1a1a;
+    }
+    
+    .chat-area {
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px;
+    }
+    
+    .message {
+        display: flex;
+        margin-bottom: 20px;
+        animation: fadeIn 0.3s ease-in;
+    }
+    
+    .message-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 12px;
+        font-size: 18px;
+        flex-shrink: 0;
+    }
+    
+    .message-avatar.user {
+        background: #007AFF;
+    }
+    
+    .message-avatar.assistant {
+        background: #34C759;
+    }
+    
+    .message-content {
+        flex: 1;
+        background: #2d2d2d;
+        padding: 16px;
+        border-radius: 12px;
+        border: 1px solid #404040;
+    }
+    
+    .message-text {
+        margin: 0 0 12px 0;
+        white-space: pre-wrap;
+    }
+    
+    .message-text:last-child {
+        margin-bottom: 0;
+    }
+    
+    /* Code Block Styling */
+    .code-block {
+        background: #1e1e1e;
+        border: 1px solid #404040;
+        border-radius: 8px;
+        padding: 16px;
+        margin: 12px 0;
+        overflow-x: auto;
+        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        font-size: 14px;
+        line-height: 1.5;
+        position: relative;
+    }
+    
+    .code-block code {
+        color: #d4d4d4;
+        background: transparent;
+        padding: 0;
+        border: none;
+        font-family: inherit;
+        font-size: inherit;
+        white-space: pre;
+        display: block;
+    }
+    
+    /* Language-specific syntax highlighting */
+    .language-python {
+        color: #d4d4d4;
+    }
+    
+    .language-python .keyword { color: #569cd6; }
+    .language-python .string { color: #ce9178; }
+    .language-python .comment { color: #6a9955; }
+    .language-python .function { color: #dcdcaa; }
+    .language-python .number { color: #b5cea8; }
+    
+    .language-javascript {
+        color: #d4d4d4;
+    }
+    
+    .language-javascript .keyword { color: #569cd6; }
+    .language-javascript .string { color: #ce9178; }
+    .language-javascript .comment { color: #6a9955; }
+    .language-javascript .function { color: #dcdcaa; }
+    .language-javascript .number { color: #b5cea8; }
+    
+    .language-css {
+        color: #d4d4d4;
+    }
+    
+    .language-css .property { color: #9cdcfe; }
+    .language-css .value { color: #ce9178; }
+    .language-css .selector { color: #d7ba7d; }
+    .language-css .comment { color: #6a9955; }
+    
+    .language-html {
+        color: #d4d4d4;
+    }
+    
+    .language-html .tag { color: #569cd6; }
+    .language-html .attribute { color: #9cdcfe; }
+    .language-html .string { color: #ce9178; }
+    .language-html .comment { color: #6a9955; }
+    
+    /* Inline code */
+    .inline-code {
+        background: #404040;
+        color: #ffffff;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        font-size: 0.9em;
+    }
+    
+    /* Markdown headers */
+    .message-text h1 {
+        font-size: 24px;
+        font-weight: 600;
+        margin: 20px 0 12px 0;
+        color: #ffffff;
+        border-bottom: 2px solid #404040;
+        padding-bottom: 8px;
+    }
+    
+    .message-text h2 {
+        font-size: 20px;
+        font-weight: 600;
+        margin: 16px 0 10px 0;
+        color: #ffffff;
+    }
+    
+    .message-text h3 {
+        font-size: 16px;
+        font-weight: 600;
+        margin: 12px 0 8px 0;
+        color: #ffffff;
+    }
+    
+    /* Markdown formatting */
+    .message-text strong {
+        font-weight: 600;
+        color: #ffffff;
+    }
+    
+    .message-text em {
+        font-style: italic;
+        color: #cccccc;
+    }
+    
+    /* Input Area */
+    .input-area {
+        padding: 20px;
+        border-top: 1px solid #404040;
+        background: #1a1a1a;
+    }
+    
+    .input-container {
+        display: flex;
+        align-items: flex-end;
+        gap: 12px;
+        background: #2d2d2d;
+        border: 1px solid #404040;
+        border-radius: 12px;
+        padding: 12px;
+    }
+    
+    .input-field {
+        flex: 1;
+        background: transparent;
+        border: none;
+        color: #ffffff;
+        font-size: 16px;
+        resize: none;
+        outline: none;
+        min-height: 24px;
+        max-height: 120px;
+        font-family: inherit;
+    }
+    
+    .input-field::placeholder {
+        color: #888888;
+    }
+    
+    .input-buttons {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+    }
+    
+    .input-button {
+        background: #404040;
+        border: none;
+        border-radius: 8px;
+        padding: 8px;
+        color: #ffffff;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+    
+    .input-button:hover {
+        background: #505050;
+    }
+    
+    .send-button {
+        background: #007AFF;
+        padding: 8px 16px;
+        border-radius: 8px;
+        border: none;
+        color: #ffffff;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+    
+    .send-button:hover {
+        background: #0056CC;
+    }
+    
+    /* Artifacts */
+    .artifacts-container {
+        margin-top: 16px;
+        padding: 16px;
+        background: #1a1a1a;
+        border-radius: 8px;
+        border: 1px solid #404040;
+    }
+    
+    .artifacts-title {
+        font-weight: 600;
+        margin-bottom: 12px;
+        color: #ffffff;
+    }
+    
+    .artifact-item {
+        display: flex;
+        align-items: center;
+        padding: 12px;
+        background: #2d2d2d;
+        border-radius: 8px;
+        margin-bottom: 8px;
+        border: 1px solid #404040;
+    }
+    
+    .artifact-icon {
+        margin-right: 12px;
+        font-size: 20px;
+    }
+    
+    .artifact-info {
+        flex: 1;
+    }
+    
+    .artifact-name {
+        font-weight: 500;
+        color: #ffffff;
+        margin-bottom: 4px;
+    }
+    
+    .artifact-meta {
+        font-size: 12px;
+        color: #888888;
+    }
+    
+    .artifact-actions {
+        display: flex;
+        gap: 8px;
+    }
+    
+    .artifact-download {
+        background: #007AFF;
+        border: none;
+        border-radius: 6px;
+        padding: 6px 12px;
+        color: #ffffff;
+        cursor: pointer;
+        font-size: 12px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        transition: background 0.2s;
+    }
+    
+    .artifact-download:hover {
+        background: #0056CC;
+    }
+    
+    /* Copy Button */
+    .copy-button {
+        background: #404040;
+        border: none;
+        border-radius: 6px;
+        padding: 6px 12px;
+        color: #ffffff;
+        cursor: pointer;
+        font-size: 12px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        margin-top: 8px;
+        transition: background 0.2s;
+    }
+    
+    .copy-button:hover {
+        background: #505050;
+    }
+    
+    .copy-button.copied {
+        background: #34C759;
+    }
+    
+    /* Animations */
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    /* Responsive */
+    @media (max-width: 768px) {
+        .sidebar {
+            width: 250px;
+        }
+        
+        .input-container {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        
+        .input-buttons {
+            justify-content: space-between;
+        }
+    }
+    """
+    return Response(css_content, mimetype='text/css')
 
 if __name__ == '__main__':
     # Initialize database
