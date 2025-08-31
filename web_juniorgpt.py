@@ -7,6 +7,10 @@ import logging
 import time
 import os
 from dotenv import load_dotenv
+from agents.agent_registry import get_registry, discover_agents
+
+from models import init_db
+from services import TeamService
 
 # Load environment variables from .env file
 load_dotenv()
@@ -17,7 +21,27 @@ app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize database
+def initialize_application():
+    try:
+        # Initialize persistent storage for teams
+        init_db('sqlite:///data/teams.db')
+        team_service = TeamService()
+
+        # Initialize conversation database
+        # (Add necessary initialization code)
+
+        # Initialize agent registry and discover default agents
+        agent_registry = get_registry()
+        discover_agents(["agents/implementations"])
+        
+        # Initialize any additional databases
+        # (Add any other needed initialization)
+
+    except Exception as e:
+        print(f"Initialization error: {e}")
+
+# Run the initializer
+initialize_application()
 def init_database():
     conn = sqlite3.connect('data/conversations.db')
     conn.execute('''
@@ -641,6 +665,35 @@ HTML_TEMPLATE = '''
             font-size: 16px;
             font-weight: 600;
         }
+
+        .team-management {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .team-management select,
+        .team-management input {
+            padding: 8px;
+            border: 1px solid #565869;
+            border-radius: 4px;
+            background: #40414f;
+            color: #ececf1;
+        }
+
+        .team-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .team-buttons button {
+            padding: 8px 12px;
+            background: transparent;
+            border: 1px solid #565869;
+            color: #ececf1;
+            border-radius: 4px;
+            cursor: pointer;
+        }
         
         .agent-grid {
             display: grid;
@@ -972,7 +1025,19 @@ HTML_TEMPLATE = '''
                     <div class="agent-toggle" id="autoModeToggle" onclick="toggleAutoMode()"></div>
                 </div>
             </div>
-            
+
+            <div class="settings-section">
+                <h3>Teams</h3>
+                <div class="team-management">
+                    <select id="teamSelect" onchange="onTeamSelect()"></select>
+                    <input type="text" id="teamName" placeholder="Team name">
+                    <div class="team-buttons">
+                        <button onclick="saveTeam()">Save Team</button>
+                        <button onclick="deleteTeam()">Delete Team</button>
+                    </div>
+                </div>
+            </div>
+
             <div class="settings-section">
                 <h3>Agent Configuration</h3>
                 <div class="agent-grid" id="agentGrid">
@@ -1025,6 +1090,7 @@ HTML_TEMPLATE = '''
 
     <script>
         let selectedAgents = [];
+        let currentTeamId = '';
         let autoMode = true;
         let isProcessing = false;
         let currentConversationId = '';
@@ -1040,6 +1106,7 @@ HTML_TEMPLATE = '''
         document.addEventListener('DOMContentLoaded', function() {
             initializeAgents();
             loadConversations();
+            loadTeams();
             updateAutoModeToggle();
             initializeModelSelection();
         });
@@ -1049,29 +1116,34 @@ HTML_TEMPLATE = '''
             Object.keys(agents).forEach(agentId => {
                 const agent = agents[agentId];
                 const agentCard = document.createElement('div');
-                agentCard.className = 'agent-card' + (agent.active ? ' active' : '');
+                agentCard.className = 'agent-card';
                 agentCard.id = 'agent-' + agentId;
-                
+
                 agentCard.innerHTML = `
                     <div class="agent-header">
                         <div class="agent-name">${agent.name}</div>
-                        <div class="agent-toggle${agent.active ? ' active' : ''}" onclick="toggleAgent('${agentId}')"></div>
+                        <div class="agent-toggle" onclick="toggleAgent('${agentId}')"></div>
                     </div>
                     <div class="agent-description">${agent.description}</div>
                     <div class="agent-model">Model: ${agent.model}</div>
                 `;
-                
+
                 agentGrid.appendChild(agentCard);
             });
+            updateAgentCardsFromSelection();
         }
         
         function toggleAgent(agentId) {
             if (autoMode) return;
-            
+
+            currentTeamId = '';
+            document.getElementById('teamSelect').value = '';
+            document.getElementById('teamName').value = '';
+
             const agentCard = document.getElementById('agent-' + agentId);
             const toggle = agentCard.querySelector('.agent-toggle');
             const isActive = agentCard.classList.contains('active');
-            
+
             if (isActive) {
                 agentCard.classList.remove('active');
                 toggle.classList.remove('active');
@@ -1090,11 +1162,98 @@ HTML_TEMPLATE = '''
             if (autoMode) {
                 // Clear manual selections
                 selectedAgents = [];
+                currentTeamId = '';
+                document.getElementById('teamSelect').value = '';
+                document.getElementById('teamName').value = '';
                 document.querySelectorAll('.agent-card').forEach(card => {
                     card.classList.remove('active');
                     card.querySelector('.agent-toggle').classList.remove('active');
                 });
             }
+        }
+
+        function loadTeams() {
+            fetch('/api/teams')
+                .then(response => response.json())
+                .then(data => {
+                    const select = document.getElementById('teamSelect');
+                    if (!select) return;
+                    select.innerHTML = '<option value="">-- Select Team --</option>';
+                    data.forEach(team => {
+                        const opt = document.createElement('option');
+                        opt.value = team.team_id;
+                        opt.textContent = team.name;
+                        select.appendChild(opt);
+                    });
+                });
+        }
+
+        function onTeamSelect() {
+            const select = document.getElementById('teamSelect');
+            const teamId = select.value;
+            if (!teamId) {
+                currentTeamId = '';
+                document.getElementById('teamName').value = '';
+                selectedAgents = [];
+                updateAgentCardsFromSelection();
+                return;
+            }
+
+            fetch('/api/teams/' + teamId)
+                .then(response => response.json())
+                .then(team => {
+                    currentTeamId = team.team_id;
+                    document.getElementById('teamName').value = team.name;
+                    selectedAgents = team.agents || [];
+                    autoMode = false;
+                    updateAutoModeToggle();
+                    updateAgentCardsFromSelection();
+                });
+        }
+
+        function updateAgentCardsFromSelection() {
+            document.querySelectorAll('.agent-card').forEach(card => {
+                const agentId = card.id.replace('agent-', '');
+                const toggle = card.querySelector('.agent-toggle');
+                if (selectedAgents.includes(agentId)) {
+                    card.classList.add('active');
+                    toggle.classList.add('active');
+                } else {
+                    card.classList.remove('active');
+                    toggle.classList.remove('active');
+                }
+            });
+        }
+
+        function saveTeam() {
+            const name = document.getElementById('teamName').value.trim();
+            if (!name) return;
+            const payload = { name: name, agents: selectedAgents };
+            if (currentTeamId) payload.team_id = currentTeamId;
+            fetch('/api/teams', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+            .then(response => response.json())
+            .then(team => {
+                currentTeamId = team.team_id;
+                loadTeams();
+                document.getElementById('teamSelect').value = team.team_id;
+            });
+        }
+
+        function deleteTeam() {
+            if (!currentTeamId) return;
+            fetch('/api/teams/' + currentTeamId, { method: 'DELETE' })
+                .then(() => {
+                    currentTeamId = '';
+                    document.getElementById('teamName').value = '';
+                    document.getElementById('teamSelect').value = '';
+                    selectedAgents = [];
+                    updateAgentCardsFromSelection();
+                    loadTeams();
+                });
         }
         
         function updateAutoModeToggle() {
@@ -1485,7 +1644,7 @@ HTML_TEMPLATE = '''
             addTypingIndicator();
             
             // Send to backend with streaming
-            const eventSource = new EventSource('/stream_chat?message=' + encodeURIComponent(message) + '&auto_mode=' + autoMode + '&selected_agents=' + JSON.stringify(selectedAgents) + '&conversation_id=' + currentConversationId);
+            const eventSource = new EventSource('/stream_chat?message=' + encodeURIComponent(message) + '&auto_mode=' + autoMode + '&selected_agents=' + JSON.stringify(selectedAgents) + '&team_id=' + currentTeamId + '&conversation_id=' + currentConversationId);
             
             eventSource.onmessage = function(event) {
                 const data = JSON.parse(event.data);
@@ -1571,6 +1730,40 @@ HTML_TEMPLATE = '''
 def home():
     return render_template_string(HTML_TEMPLATE)
 
+
+@app.route('/api/teams', methods=['GET', 'POST'])
+def manage_teams():
+    """Create new teams or list existing ones"""
+    if request.method == 'GET':
+        return jsonify(team_service.list_teams())
+
+    data = request.get_json() or {}
+    name = data.get('name')
+    agents = data.get('agents', [])
+    team_id = data.get('team_id')
+
+    if not name:
+        return jsonify({'error': 'Name is required'}), 400
+
+    if team_id:
+        team = team_service.update_team(team_id, name=name, agents=agents)
+    else:
+        team = team_service.create_team(name, agents)
+    return jsonify(team)
+
+
+@app.route('/api/teams/<team_id>', methods=['GET', 'DELETE'])
+def team_detail(team_id):
+    """Retrieve or delete a specific team"""
+    if request.method == 'GET':
+        team = team_service.get_team(team_id)
+        if team:
+            return jsonify(team)
+        return jsonify({'error': 'Not found'}), 404
+
+    deleted = team_service.delete_team(team_id)
+    return jsonify({'success': deleted})
+
 @app.route('/api/conversations')
 def get_conversations():
     """Get all conversations for the sidebar"""
@@ -1641,35 +1834,53 @@ def stream_chat():
     auto_mode = request.args.get('auto_mode', 'true').lower() == 'true'
     conversation_id = request.args.get('conversation_id', '')
 
-    # Parse selected agents from query parameters with error handling
-    try:
-        selected_agents = json.loads(request.args.get("selected_agents", "[]"))
-        if not isinstance(selected_agents, list):
-            logger.error("selected_agents parameter is not a list")
-            selected_agents = []
-    except json.JSONDecodeError as e:
-        logger.error(f"Error parsing selected_agents: {e}")
-        selected_agents = []
+# Parse team ID and selected agents from query parameters with error handling
+team_id = request.args.get('team_id')
 
+# Initialize selected_agents to an empty list
+selected_agents = []
+
+# Attempt to parse selected agents, with error handling
+try:
+    selected_agents = json.loads(request.args.get('selected_agents', '[]'))
+    if not isinstance(selected_agents, list):
+        logger.error("selected_agents parameter is not a list")
+        selected_agents = []
+except json.JSONDecodeError as e:
+    logger.error(f"Error parsing selected_agents: {e}")
+
+# If team_id is provided, retrieve agents from the team
+if team_id:
+    team = team_service.get_team(team_id)
+    if team and team.get('agents'):
+        selected_agents = team['agents']
+
+# Set auto_mode to False if valid team agents are found
+auto_mode = not bool(selected_agents)
     # Generate new conversation ID if not provided
     if not conversation_id:
         conversation_id = datetime.now().strftime('%Y%m%d_%H%M%S')
 
     def generate():
         try:
-            # Determine which agents to use
-            if auto_mode:
-                agents_to_use = auto_detect_agents(message)
-            else:
-                agents_to_use = selected_agents or [next(iter(AGENTS))]
-                if not selected_agents:
-                    logger.info("No selected_agents provided; falling back to default agent")
+
+    # Determine which agents to use
+if auto_mode:
+    agents_to_use = auto_detect_agents(message)
+else:
+    # Use selected agents if provided; fallback to default agent if not
+    agents_to_use = selected_agents if selected_agents else [next(iter(AGENTS))]
+    
+    if not selected_agents:
+        logger.info("No selected_agents provided; falling back to default agent")
 
             # Process with each agent in real-time
             final_response = ""
             agents_used = []
 
-            for agent_id in agents_to_use:
+    # Use the selected agents or auto-detected agents
+for agent_id in agents_to_use:
+    # Process each agent_id as needed
                 if agent_id in AGENTS:
                     agent = AGENTS[agent_id]
                     agents_used.append(agent['name'])
@@ -1774,49 +1985,11 @@ Remember: You are a BUILDER, not just an advisor. Create actual working solution
     return Response(generate(), mimetype='text/event-stream')
 
 def auto_detect_agents(message):
-    """Auto-detect which agents are relevant to the user's request"""
-    message_lower = message.lower()
-    relevant_agents = []
-    
-    # Simple keyword-based detection (in a real system, this would use AI)
-    if any(word in message_lower for word in ['code', 'program', 'debug', 'software', 'function']):
-        relevant_agents.append('coding')
-    if any(word in message_lower for word in ['research', 'find', 'information', 'data']):
-        relevant_agents.append('research')
-    if any(word in message_lower for word in ['analyze', 'analysis', 'insights', 'trends']):
-        relevant_agents.append('analysis')
-    if any(word in message_lower for word in ['write', 'content', 'document', 'article']):
-        relevant_agents.append('writing')
-    if any(word in message_lower for word in ['plan', 'strategy', 'project', 'organize']):
-        relevant_agents.append('planning')
-    if any(word in message_lower for word in ['problem', 'error', 'fix', 'issue']):
-        relevant_agents.append('debugging')
-    if any(word in message_lower for word in ['creative', 'design', 'idea', 'art']):
-        relevant_agents.append('creative')
-    if any(word in message_lower for word in ['learn', 'explain', 'teach', 'education']):
-        relevant_agents.append('learning')
-    if any(word in message_lower for word in ['communicate', 'summarize', 'explain']):
-        relevant_agents.append('communication')
-    if any(word in message_lower for word in ['optimize', 'improve', 'performance', 'efficient']):
-        relevant_agents.append('optimization')
-    if any(word in message_lower for word in ['security', 'secure', 'vulnerability']):
-        relevant_agents.append('security')
-    if any(word in message_lower for word in ['test', 'testing', 'validate']):
-        relevant_agents.append('testing')
-    if any(word in message_lower for word in ['document', 'docs', 'manual']):
-        relevant_agents.append('documentation')
-    if any(word in message_lower for word in ['api', 'integrate', 'connect', 'system']):
-        relevant_agents.append('integration')
-    
-    # Special handling for visualization requests
-    if any(word in message_lower for word in ['visualization', 'visualize', 'chart', 'graph', 'map', 'plot', 'dashboard']):
-        relevant_agents = ['analysis', 'coding', 'creative']
-    
-    # Default to communication agent if no specific agents detected
-    if not relevant_agents:
-        relevant_agents = ['communication']
-    
-    return relevant_agents
+    """Auto-detect relevant agents using the global registry"""
+    selected = agent_registry.auto_select_agents(message)
+    if not selected:
+        selected = ['communication']
+    return selected
 
 def save_conversation(user_input, response, conversation_id):
     """Save conversation to database"""
