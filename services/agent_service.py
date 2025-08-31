@@ -7,6 +7,7 @@ import re
 from typing import Dict, List, Optional, Set, Tuple, Any
 import logging
 from datetime import datetime
+import httpx
 
 from models.database import db
 from models.agent import Agent, AgentExecution
@@ -233,63 +234,82 @@ class AgentService:
             execution_id = execution.execution_id
         
         try:
-            # Prepare agent-specific prompt
-            agent_prompt = self._create_agent_prompt(agent_config, message)
-            
-            # Generate thinking trace
-            thinking_trace = f"Agent {agent_config['name']} is processing: {message[:100]}..."
-            
-            # Get response from model
-            model_response = await self.model_service.generate_response(
-                prompt=agent_prompt,
-                model=agent_config["model"],
-                conversation_history=conversation_history,
-                temperature=agent.temperature,
-                max_tokens=agent.max_tokens
-            )
-            
-            if not model_response.success:
-                raise Exception(model_response.error)
-            
+            endpoint = agent_config.get("endpoint")
+            if endpoint:
+                start_time = time.time()
+                async with httpx.AsyncClient(timeout=agent_config.get("timeout", 60)) as client:
+                    response = await client.post(
+                        f"{endpoint.rstrip('/')}/process",
+                        json={"message": message, "context": {"conversation_history": conversation_history}},
+                    )
+                if response.status_code != 200:
+                    raise Exception(f"Remote agent error {response.status_code}: {response.text}")
+                data = response.json()
+                content = data.get("content", "")
+                thinking_trace = data.get("thinking_trace", "")
+                tokens_used = data.get("tokens_used", 0)
+                response_time = data.get("execution_time", time.time() - start_time)
+            else:
+                # Prepare agent-specific prompt
+                agent_prompt = self._create_agent_prompt(agent_config, message)
+
+                # Generate thinking trace
+                thinking_trace = f"Agent {agent_config['name']} is processing: {message[:100]}..."
+
+                # Get response from model
+                model_response = await self.model_service.generate_response(
+                    prompt=agent_prompt,
+                    model=agent_config["model"],
+                    conversation_history=conversation_history,
+                    temperature=agent.temperature,
+                    max_tokens=agent.max_tokens,
+                )
+
+                if not model_response.success:
+                    raise Exception(model_response.error)
+                content = model_response.content
+                tokens_used = model_response.tokens_used
+                response_time = model_response.response_time
+
             # Update execution record
             with db.get_session() as session:
                 execution = session.query(AgentExecution).filter_by(
                     execution_id=execution_id
                 ).first()
-                
+
                 if execution:
                     execution.mark_completed(
-                        response_time=model_response.response_time,
-                        tokens_used=model_response.tokens_used,
+                        response_time=response_time,
+                        tokens_used=tokens_used,
                         thinking_trace={"thinking": thinking_trace}
                     )
-                    
+
                     # Update agent performance
-                    agent = session.query(Agent).get(execution.agent_id)
-                    if agent:
-                        agent.update_performance(model_response.response_time, True)
-                
+                    agent_db = session.query(Agent).get(execution.agent_id)
+                    if agent_db:
+                        agent_db.update_performance(response_time, True)
+
                 session.commit()
-            
-            return execution_id, model_response.content, thinking_trace
-            
+
+            return execution_id, content, thinking_trace
+
         except Exception as e:
             # Mark execution as failed
             with db.get_session() as session:
                 execution = session.query(AgentExecution).filter_by(
                     execution_id=execution_id
                 ).first()
-                
+
                 if execution:
                     execution.mark_failed(str(e))
-                    
+
                     # Update agent performance
-                    agent = session.query(Agent).get(execution.agent_id)
-                    if agent:
-                        agent.update_performance(0.0, False)
-                
+                    agent_db = session.query(Agent).get(execution.agent_id)
+                    if agent_db:
+                        agent_db.update_performance(0.0, False)
+
                 session.commit()
-            
+
             raise e
     
     def _create_agent_prompt(self, agent_config: Dict[str, Any], message: str) -> str:
