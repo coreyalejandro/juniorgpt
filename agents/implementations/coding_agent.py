@@ -27,7 +27,21 @@ class CodingAgent(BaseAgent):
     """
     
     def __init__(self, model_service=None, logger=None):
-        config = AgentConfig(
+        config = self._get_default_config()
+        super().__init__(config, model_service, logger)
+        
+        # Coding-specific settings
+        self.supported_languages = [
+            "python", "javascript", "typescript", "java", "c++", "c#", "go",
+            "rust", "ruby", "php", "swift", "kotlin", "scala", "r", "sql"
+        ]
+        self.code_quality_checks = True
+        self.security_analysis = True
+        self.performance_optimization = True
+    
+    def _get_default_config(self) -> AgentConfig:
+        """Get default configuration for coding agent"""
+        return AgentConfig(
             agent_id="coding",
             name="💻 Coding Agent",
             description="Software development and programming specialist",
@@ -47,16 +61,6 @@ class CodingAgent(BaseAgent):
             required_apis=["anthropic", "openai"],
             required_models=["claude-3-5-sonnet", "gpt-4o"]
         )
-        super().__init__(config, model_service, logger)
-        
-        # Coding-specific settings
-        self.supported_languages = [
-            "python", "javascript", "typescript", "java", "c++", "c#", "go",
-            "rust", "ruby", "php", "swift", "kotlin", "scala", "r", "sql"
-        ]
-        self.code_quality_checks = True
-        self.security_analysis = True
-        self.performance_optimization = True
     
     async def process(self, message: str, context: Dict[str, Any] = None) -> AgentResponse:
         """Process coding request"""

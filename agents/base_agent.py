@@ -109,9 +109,20 @@ class BaseAgent(abc.ABC):
     
     Each agent should inherit from this class and implement the required methods.
     Agents can be run standalone or integrated into larger systems.
+    
+    Key Features:
+    - Absolute modularity and independence
+    - Microservice deployment ready
+    - Team collaboration capable
+    - Health monitoring and metrics
+    - Standardized interfaces
     """
     
-    def __init__(self, config: AgentConfig, model_service=None, logger=None):
+    def __init__(self, config: AgentConfig = None, model_service=None, logger=None):
+        # Handle case where no config is provided (for abstract instantiation)
+        if config is None:
+            config = self._get_default_config()
+        
         self.config = config
         self.model_service = model_service
         self.logger = logger or logging.getLogger(f"agent.{config.agent_id}")
@@ -125,8 +136,30 @@ class BaseAgent(abc.ABC):
         self.on_complete_hooks = []
         self.on_error_hooks = []
         
+        # Collaboration context for team work
+        self.team_context = {}
+        self.peer_agents = []
+        
+        # Performance metrics
+        self.execution_metrics = {
+            "total_executions": 0,
+            "successful_executions": 0,
+            "average_response_time": 0.0,
+            "last_execution_time": None
+        }
+        
         # Validate configuration
         self._validate_config()
+    
+    def _get_default_config(self) -> AgentConfig:
+        """Get default configuration for agent (override in subclasses)"""
+        return AgentConfig(
+            agent_id="base_agent",
+            name="Base Agent",
+            description="Base agent implementation",
+            version="1.0.0",
+            author="JuniorGPT"
+        )
     
     def _validate_config(self):
         """Validate agent configuration"""
@@ -215,6 +248,9 @@ class BaseAgent(abc.ABC):
             # Update response metadata
             response.execution_time = time.time() - self.start_time
             response.agent_id = self.config.agent_id
+            
+            # Update performance metrics
+            self._update_metrics(response.execution_time, response.status == AgentStatus.COMPLETED)
             
             if response.status == AgentStatus.COMPLETED:
                 self.status = AgentStatus.COMPLETED
@@ -310,7 +346,10 @@ class BaseAgent(abc.ABC):
             "status": self.status.value,
             "execution_id": self.execution_id,
             "uptime": time.time() - (self.start_time or time.time()),
-            "config": asdict(self.config)
+            "config": asdict(self.config),
+            "performance": self.execution_metrics.copy(),
+            "team_context": bool(self.team_context),
+            "peer_agents_count": len(self.peer_agents)
         }
     
     def to_dict(self) -> Dict[str, Any]:
@@ -374,6 +413,75 @@ class BaseAgent(abc.ABC):
     
     def __str__(self) -> str:
         return f"{self.config.name} (v{self.config.version}) - {self.config.description}"
+    
+    def _update_metrics(self, execution_time: float, success: bool):
+        """Update performance metrics"""
+        self.execution_metrics["total_executions"] += 1
+        if success:
+            self.execution_metrics["successful_executions"] += 1
+        
+        # Update average response time
+        total = self.execution_metrics["total_executions"]
+        current_avg = self.execution_metrics["average_response_time"]
+        self.execution_metrics["average_response_time"] = ((current_avg * (total - 1)) + execution_time) / total
+        self.execution_metrics["last_execution_time"] = datetime.utcnow().isoformat()
+    
+    def set_team_context(self, team_id: str, role: str, peer_agents: List[str]):
+        """Set team collaboration context"""
+        self.team_context = {
+            "team_id": team_id,
+            "role": role,
+            "joined_at": datetime.utcnow().isoformat()
+        }
+        self.peer_agents = peer_agents.copy()
+        self.logger.info(f"Agent assigned to team {team_id} as {role}")
+    
+    def clear_team_context(self):
+        """Clear team collaboration context"""
+        self.team_context = {}
+        self.peer_agents = []
+    
+    def is_team_member(self) -> bool:
+        """Check if agent is part of a team"""
+        return bool(self.team_context)
+    
+    def get_deployment_config(self) -> Dict[str, Any]:
+        """Get configuration for microservice deployment"""
+        return {
+            "agent_id": self.config.agent_id,
+            "name": self.config.name,
+            "description": self.config.description,
+            "version": self.config.version,
+            "model": self.config.model,
+            "timeout": self.config.timeout,
+            "required_apis": self.config.required_apis.copy(),
+            "required_models": self.config.required_models.copy(),
+            "deployment_ready": self._is_deployment_ready()
+        }
+    
+    def _is_deployment_ready(self) -> bool:
+        """Check if agent is ready for independent deployment"""
+        try:
+            # Check if agent can handle basic operations
+            capabilities = self.get_capabilities()
+            health = self.health_check()
+            return capabilities is not None and health.get('healthy', False)
+        except:
+            return False
+    
+    async def collaborate_with_peers(self, message: str, peer_responses: Dict[str, str]) -> AgentResponse:
+        """Collaborate with peer agents (override for custom collaboration)"""
+        # Default collaboration: incorporate peer insights into context
+        enhanced_context = {
+            "peer_responses": peer_responses,
+            "collaboration_mode": True,
+            "team_context": self.team_context
+        }
+        
+        # Enhance message with collaboration context
+        collaboration_message = f"Original request: {message}\n\nPeer insights available for consideration."
+        
+        return await self.process(collaboration_message, enhanced_context)
     
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}(id={self.config.agent_id}, status={self.status.value})>"

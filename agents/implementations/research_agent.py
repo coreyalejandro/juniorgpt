@@ -25,7 +25,17 @@ class ResearchAgent(BaseAgent):
     """
     
     def __init__(self, model_service=None, logger=None):
-        config = AgentConfig(
+        config = self._get_default_config()
+        super().__init__(config, model_service, logger)
+        
+        # Research-specific settings
+        self.max_sources = 10
+        self.enable_web_search = True
+        self.fact_check_threshold = 0.8
+    
+    def _get_default_config(self) -> AgentConfig:
+        """Get default configuration for research agent"""
+        return AgentConfig(
             agent_id="research",
             name="🔍 Research Agent",
             description="Deep research and information gathering specialist",
@@ -45,12 +55,6 @@ class ResearchAgent(BaseAgent):
             required_apis=["openai", "anthropic", "web_search"],
             required_models=["gpt-4o-mini", "gpt-4o"]
         )
-        super().__init__(config, model_service, logger)
-        
-        # Research-specific settings
-        self.max_sources = 10
-        self.enable_web_search = True
-        self.fact_check_threshold = 0.8
     
     async def process(self, message: str, context: Dict[str, Any] = None) -> AgentResponse:
         """Process research request"""

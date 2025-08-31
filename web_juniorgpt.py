@@ -1,4 +1,4 @@
-from flask import Flask, render_template_string, request, Response, jsonify
+from flask import Flask, render_template_string, request, Response, jsonify, send_file
 import requests
 import json
 import sqlite3
@@ -6,6 +6,9 @@ from datetime import datetime
 import logging
 import time
 import os
+import uuid
+import base64
+from pathlib import Path
 from dotenv import load_dotenv
 from agents.agent_registry import get_registry, discover_agents
 from models import init_db
@@ -43,6 +46,68 @@ def initialize_application():
 
 # Run the initializer
 initialize_application()
+
+# Artifact management system
+class ArtifactManager:
+    def __init__(self, artifacts_dir="artifacts"):
+        self.artifacts_dir = Path(artifacts_dir)
+        self.artifacts_dir.mkdir(exist_ok=True)
+        
+    def create_artifact(self, content, filename, content_type="text/plain", metadata=None):
+        """Create a new artifact file"""
+        artifact_id = str(uuid.uuid4())
+        artifact_path = self.artifacts_dir / f"{artifact_id}_{filename}"
+        
+        # Write content to file
+        if content_type.startswith("text/"):
+            with open(artifact_path, 'w', encoding='utf-8') as f:
+                f.write(content)
+        else:
+            # Handle binary content (base64 encoded)
+            if isinstance(content, str):
+                content = base64.b64decode(content)
+            with open(artifact_path, 'wb') as f:
+                f.write(content)
+        
+        # Store metadata
+        artifact_info = {
+            "id": artifact_id,
+            "filename": filename,
+            "content_type": content_type,
+            "path": str(artifact_path),
+            "size": artifact_path.stat().st_size,
+            "created_at": datetime.now().isoformat(),
+            "metadata": metadata or {}
+        }
+        
+        return artifact_info
+    
+    def get_artifact(self, artifact_id):
+        """Get artifact file for download"""
+        for file_path in self.artifacts_dir.glob(f"{artifact_id}_*"):
+            return file_path
+        return None
+    
+    def list_artifacts(self):
+        """List all artifacts"""
+        artifacts = []
+        for file_path in self.artifacts_dir.glob("*"):
+            if file_path.is_file():
+                # Extract artifact ID and filename
+                parts = file_path.name.split("_", 1)
+                if len(parts) == 2:
+                    artifact_id, filename = parts
+                    artifacts.append({
+                        "id": artifact_id,
+                        "filename": filename,
+                        "size": file_path.stat().st_size,
+                        "created_at": datetime.fromtimestamp(file_path.stat().st_mtime).isoformat()
+                    })
+        return artifacts
+
+# Initialize artifact manager
+artifact_manager = ArtifactManager()
+
 def init_database():
     conn = sqlite3.connect('data/conversations.db')
     conn.execute('''
@@ -230,6 +295,82 @@ HTML_TEMPLATE = '''
             flex: 1;
             overflow-y: auto;
             padding: 8px;
+        }
+        
+        .artifacts-panel {
+            border-top: 1px solid #4a4b53;
+            background: #202123;
+        }
+        
+        .artifacts-header {
+            padding: 12px 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid #4a4b53;
+            font-size: 14px;
+            font-weight: 600;
+            color: #ececf1;
+        }
+        
+        .refresh-artifacts-btn {
+            background: none;
+            border: none;
+            color: #8e8ea0;
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+        }
+        
+        .refresh-artifacts-btn:hover {
+            background: #40414f;
+            color: #ececf1;
+        }
+        
+        .artifacts-list {
+            max-height: 200px;
+            overflow-y: auto;
+            padding: 8px;
+        }
+        
+        .sidebar-artifact-item {
+            display: flex;
+            align-items: center;
+            padding: 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            margin-bottom: 4px;
+        }
+        
+        .sidebar-artifact-item:hover {
+            background: #40414f;
+        }
+        
+        .sidebar-artifact-icon {
+            font-size: 16px;
+            margin-right: 8px;
+            width: 16px;
+            text-align: center;
+        }
+        
+        .sidebar-artifact-info {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .sidebar-artifact-name {
+            color: #ececf1;
+            font-size: 12px;
+            font-weight: 500;
+            margin-bottom: 2px;
+            word-break: break-all;
+        }
+        
+        .sidebar-artifact-meta {
+            color: #8e8ea0;
+            font-size: 10px;
         }
         
         .conversation-item {
@@ -467,6 +608,87 @@ HTML_TEMPLATE = '''
             background: #19c37d;
             color: #ffffff;
             border-color: #19c37d;
+        }
+        
+        .artifacts-container {
+            margin-top: 16px;
+            border: 1px solid #565869;
+            border-radius: 8px;
+            background: #2a2a2a;
+            overflow: hidden;
+        }
+        
+        .artifacts-title {
+            padding: 12px 16px;
+            background: #40414f;
+            color: #ffffff;
+            font-weight: 600;
+            font-size: 14px;
+            border-bottom: 1px solid #565869;
+        }
+        
+        .artifact-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            border-bottom: 1px solid #565869;
+            transition: background-color 0.2s ease;
+        }
+        
+        .artifact-item:last-child {
+            border-bottom: none;
+        }
+        
+        .artifact-item:hover {
+            background: #40414f;
+        }
+        
+        .artifact-icon {
+            font-size: 24px;
+            margin-right: 12px;
+            width: 24px;
+            text-align: center;
+        }
+        
+        .artifact-info {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .artifact-name {
+            color: #ffffff;
+            font-weight: 500;
+            font-size: 14px;
+            margin-bottom: 4px;
+            word-break: break-all;
+        }
+        
+        .artifact-meta {
+            color: #8e8ea0;
+            font-size: 12px;
+        }
+        
+        .artifact-actions {
+            margin-left: 12px;
+        }
+        
+        .artifact-download {
+            background: #19c37d;
+            border: none;
+            color: #ffffff;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s ease;
+        }
+        
+        .artifact-download:hover {
+            background: #15a367;
+            transform: translateY(-1px);
         }
         
         .message-attachments {
@@ -939,6 +1161,20 @@ HTML_TEMPLATE = '''
                 <!-- Conversations will be populated here -->
             </div>
             
+            <div class="artifacts-panel">
+                <div class="artifacts-header">
+                    <span>📁 Generated Files</span>
+                    <button class="refresh-artifacts-btn" onclick="loadArtifacts()" title="Refresh artifacts">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M23 4v6h-6M1 20v-6h6M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="artifacts-list" id="artifactsList">
+                    <!-- Artifacts will be populated here -->
+                </div>
+            </div>
+            
             <div class="sidebar-footer">
                 <button class="settings-btn" onclick="openSettings()">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1134,6 +1370,7 @@ HTML_TEMPLATE = '''
         document.addEventListener('DOMContentLoaded', function() {
             loadAgents();
             loadConversations();
+            loadArtifacts();
             loadTeams();
             updateAutoModeToggle();
             initializeModelSelection();
@@ -1501,6 +1738,38 @@ HTML_TEMPLATE = '''
                 });
         }
         
+        function loadArtifacts() {
+            // Load artifacts from the API
+            fetch('/api/artifacts')
+                .then(response => response.json())
+                .then(artifacts => {
+                    const artifactsList = document.getElementById('artifactsList');
+                    artifactsList.innerHTML = '';
+                    
+                    if (artifacts.length === 0) {
+                        artifactsList.innerHTML = '<div style="color: #8e8ea0; font-size: 12px; text-align: center; padding: 16px;">No files generated yet</div>';
+                        return;
+                    }
+                    
+                    artifacts.forEach(artifact => {
+                        const artifactItem = document.createElement('div');
+                        artifactItem.className = 'sidebar-artifact-item';
+                        artifactItem.onclick = () => downloadArtifact(artifact.id);
+                        artifactItem.innerHTML = `
+                            <div class="sidebar-artifact-icon">${getFileIcon(artifact.filename)}</div>
+                            <div class="sidebar-artifact-info">
+                                <div class="sidebar-artifact-name">${artifact.filename}</div>
+                                <div class="sidebar-artifact-meta">${formatFileSize(artifact.size)} • ${new Date(artifact.created_at).toLocaleDateString()}</div>
+                            </div>
+                        `;
+                        artifactsList.appendChild(artifactItem);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error loading artifacts:', error);
+                });
+        }
+        
         function loadConversation(conversationId) {
             // Load conversation messages from the database
             currentConversationId = conversationId;
@@ -1549,7 +1818,7 @@ HTML_TEMPLATE = '''
             }
         }
         
-        function addMessage(content, isUser = false, agentName = null, attachments = []) {
+        function addMessage(content, isUser = false, agentName = null, attachments = [], artifacts = []) {
             const messagesContainer = document.getElementById('messagesContainer');
             const messageDiv = document.createElement('div');
             messageDiv.className = 'message ' + (isUser ? 'user' : 'assistant');
@@ -1581,7 +1850,7 @@ HTML_TEMPLATE = '''
             let copyButton = '';
             if (!isUser && content) {
                 copyButton = `
-                    <button class="copy-button" onclick="copyToClipboard(this, \`${content.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`)">
+                    <button class="copy-button" onclick="copyToClipboard(this, \`${content.replace(/`/g, '\\\\`').replace(/\$/g, '\\\\$')}\`)">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                             <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
@@ -1591,12 +1860,43 @@ HTML_TEMPLATE = '''
                 `;
             }
             
+            // Add artifacts display
+            let artifactsHtml = '';
+            if (artifacts && artifacts.length > 0) {
+                artifactsHtml = '<div class="artifacts-container">';
+                artifactsHtml += '<div class="artifacts-title">📁 Generated Files:</div>';
+                artifacts.forEach(artifact => {
+                    const fileIcon = getFileIcon(artifact.filename);
+                    artifactsHtml += `
+                        <div class="artifact-item">
+                            <div class="artifact-icon">${fileIcon}</div>
+                            <div class="artifact-info">
+                                <div class="artifact-name">${artifact.filename}</div>
+                                <div class="artifact-meta">${formatFileSize(artifact.size)} • ${artifact.created_at}</div>
+                            </div>
+                            <div class="artifact-actions">
+                                <button class="artifact-download" onclick="downloadArtifact('${artifact.id}')">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                        <polyline points="7,10 12,15 17,10"></polyline>
+                                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                                    </svg>
+                                    Download
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                });
+                artifactsHtml += '</div>';
+            }
+            
             messageDiv.innerHTML = `
                 <div class="message-avatar ${avatarClass}">${avatar}</div>
                 <div class="message-content">
                     ${agentIndicator}
                     <p>${content || ''}</p>
                     ${attachmentsHtml}
+                    ${artifactsHtml}
                     ${copyButton}
                 </div>
             `;
@@ -1713,9 +2013,10 @@ HTML_TEMPLATE = '''
                     // Handle complete agent response
                     const agentName = data.agent_name;
                     const response = data.response;
+                    const artifacts = data.artifacts || [];
                     
                     // Add the agent's response to the chat
-                    addMessage(response, false, agentName);
+                    addMessage(response, false, agentName, [], artifacts);
                     
                     // Update thinking trace
                     updateThinkingTrace(agentName, 'Response complete');
@@ -1798,6 +2099,51 @@ HTML_TEMPLATE = '''
                 console.error('Failed to copy: ', err);
                 alert('Failed to copy to clipboard');
             });
+        }
+        
+        // Artifact helper functions
+        function getFileIcon(filename) {
+            const ext = filename.split('.').pop().toLowerCase();
+            const icons = {
+                'html': '🌐',
+                'css': '🎨',
+                'js': '⚡',
+                'jsx': '⚛️',
+                'ts': '📘',
+                'tsx': '📘',
+                'py': '🐍',
+                'json': '📄',
+                'xml': '📋',
+                'yml': '⚙️',
+                'yaml': '⚙️',
+                'md': '📝',
+                'sql': '🗄️',
+                'sh': '💻',
+                'php': '🐘',
+                'java': '☕',
+                'cpp': '⚙️',
+                'c': '⚙️',
+                'go': '🐹',
+                'rs': '🦀',
+                'rb': '💎',
+                'swift': '🍎',
+                'kt': '☕',
+                'vue': '💚',
+                'txt': '📄'
+            };
+            return icons[ext] || '📄';
+        }
+        
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+        
+        function downloadArtifact(artifactId) {
+            window.open(`/api/artifacts/${artifactId}`, '_blank');
         }
     </script>
 </body>
@@ -1906,6 +2252,99 @@ def get_conversation_messages(conversation_id):
     except Exception as e:
         logger.error(f"Error getting conversation messages: {e}")
         return jsonify([])
+
+def create_artifacts_from_response(response_text, agent_name):
+    """Extract code blocks from agent response and create artifacts"""
+    artifacts = []
+    
+    try:
+        # Look for code blocks in the response
+        import re
+        
+        # Pattern to match code blocks with language specification
+        code_block_pattern = r'```(\w+)\n(.*?)```'
+        matches = re.findall(code_block_pattern, response_text, re.DOTALL)
+        
+        for i, (language, code_content) in enumerate(matches):
+            # Determine file extension based on language
+            file_extensions = {
+                'html': '.html',
+                'css': '.css',
+                'javascript': '.js',
+                'js': '.js',
+                'python': '.py',
+                'py': '.py',
+                'json': '.json',
+                'xml': '.xml',
+                'yaml': '.yml',
+                'yml': '.yml',
+                'markdown': '.md',
+                'md': '.md',
+                'sql': '.sql',
+                'bash': '.sh',
+                'sh': '.sh',
+                'typescript': '.ts',
+                'ts': '.ts',
+                'react': '.jsx',
+                'jsx': '.jsx',
+                'vue': '.vue',
+                'php': '.php',
+                'java': '.java',
+                'cpp': '.cpp',
+                'c': '.c',
+                'go': '.go',
+                'rust': '.rs',
+                'rs': '.rs',
+                'ruby': '.rb',
+                'rb': '.rb',
+                'swift': '.swift',
+                'kotlin': '.kt',
+                'kt': '.kt'
+            }
+            
+            extension = file_extensions.get(language.lower(), '.txt')
+            filename = f"{agent_name.replace(' ', '_').replace('🔍', 'research').replace('💻', 'coding').replace('📊', 'analysis').replace('✍️', 'writing').replace('📋', 'planning').replace('🐛', 'debugging').replace('🎨', 'creative').replace('🔧', 'engineering').replace('📈', 'business').replace('🌐', 'web').replace('🤖', 'ai').replace('💬', 'communication').replace('📚', 'learning')}_{i+1}{extension}"
+            
+            # Create artifact
+            try:
+                artifact_info = artifact_manager.create_artifact(
+                    content=code_content.strip(),
+                    filename=filename,
+                    content_type='text/plain',
+                    metadata={
+                        'agent': agent_name,
+                        'language': language,
+                        'created_from': 'code_block'
+                    }
+                )
+                artifacts.append(artifact_info)
+            except Exception as e:
+                logger.error(f"Error creating artifact for {filename}: {e}")
+        
+        # Also look for file creation patterns in the response
+        file_pattern = r'```(\w+)\s*\(([^)]+)\)\n(.*?)```'
+        file_matches = re.findall(file_pattern, response_text, re.DOTALL)
+        
+        for language, filename, code_content in file_matches:
+            try:
+                artifact_info = artifact_manager.create_artifact(
+                    content=code_content.strip(),
+                    filename=filename,
+                    content_type='text/plain',
+                    metadata={
+                        'agent': agent_name,
+                        'language': language,
+                        'created_from': 'file_specification'
+                    }
+                )
+                artifacts.append(artifact_info)
+            except Exception as e:
+                logger.error(f"Error creating artifact for {filename}: {e}")
+                
+    except Exception as e:
+        logger.error(f"Error creating artifacts from response: {e}")
+    
+    return artifacts
 
 @app.route('/stream_chat')
 def stream_chat():
@@ -2028,8 +2467,17 @@ Remember: You are a BUILDER, not just an advisor. Create actual working solution
                             # Use the model response function
                             agent_response = get_model_response(agent['model'], enhanced_prompt, conversation_history)
                             
-                            # Send the complete response
-                            yield f"data: {json.dumps({'type': 'agent_response', 'agent_name': agent['name'], 'response': agent_response})}\n\n"
+                            # Create artifacts from code blocks in the response
+                            artifacts_created = create_artifacts_from_response(agent_response, agent['name'])
+                            
+                            # Send the complete response with artifacts
+                            response_data = {
+                                'type': 'agent_response', 
+                                'agent_name': agent['name'], 
+                                'response': agent_response,
+                                'artifacts': artifacts_created
+                            }
+                            yield f"data: {json.dumps(response_data)}\n\n"
                             
                         except Exception as e:
                             agent_response = f"Error: {str(e)}"
@@ -2452,6 +2900,69 @@ def search_internet(query, max_results=5):
         logger.error(f"Error searching internet: {e}")
         return f"Search completed for: {query}\n\nFor the most up-to-date information, I recommend checking recent sources on this topic."
 
+# Artifact API endpoints
+@app.route('/api/artifacts', methods=['GET'])
+def list_artifacts():
+    """List all available artifacts"""
+    try:
+        artifacts = artifact_manager.list_artifacts()
+        return jsonify(artifacts)
+    except Exception as e:
+        logger.error(f"Error listing artifacts: {e}")
+        return jsonify({'error': 'Failed to list artifacts'}), 500
+
+@app.route('/api/artifacts', methods=['POST'])
+def create_artifact():
+    """Create a new artifact"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        content = data.get('content')
+        filename = data.get('filename')
+        content_type = data.get('content_type', 'text/plain')
+        metadata = data.get('metadata', {})
+        
+        if not content or not filename:
+            return jsonify({'error': 'Content and filename are required'}), 400
+        
+        artifact_info = artifact_manager.create_artifact(content, filename, content_type, metadata)
+        return jsonify(artifact_info), 201
+        
+    except Exception as e:
+        logger.error(f"Error creating artifact: {e}")
+        return jsonify({'error': 'Failed to create artifact'}), 500
+
+@app.route('/api/artifacts/<artifact_id>', methods=['GET'])
+def download_artifact(artifact_id):
+    """Download an artifact file"""
+    try:
+        artifact_path = artifact_manager.get_artifact(artifact_id)
+        if not artifact_path or not artifact_path.exists():
+            return jsonify({'error': 'Artifact not found'}), 404
+        
+        return send_file(artifact_path, as_attachment=True)
+        
+    except Exception as e:
+        logger.error(f"Error downloading artifact {artifact_id}: {e}")
+        return jsonify({'error': 'Failed to download artifact'}), 500
+
+@app.route('/api/artifacts/<artifact_id>', methods=['DELETE'])
+def delete_artifact(artifact_id):
+    """Delete an artifact"""
+    try:
+        artifact_path = artifact_manager.get_artifact(artifact_id)
+        if not artifact_path or not artifact_path.exists():
+            return jsonify({'error': 'Artifact not found'}), 404
+        
+        artifact_path.unlink()
+        return jsonify({'success': True}), 200
+        
+    except Exception as e:
+        logger.error(f"Error deleting artifact {artifact_id}: {e}")
+        return jsonify({'error': 'Failed to delete artifact'}), 500
+
 if __name__ == '__main__':
     # Initialize database
     init_database()
@@ -2464,5 +2975,6 @@ if __name__ == '__main__':
     print("- Conversation history")
     print("- Settings panel for agent configuration")
     print("- Auto-agent detection")
+    print("- 🆕 Artifact system for file generation")
     
     app.run(host='0.0.0.0', port=8080, debug=False)

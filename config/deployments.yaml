@@ -1,0 +1,96 @@
+# Agent Deployment Configurations
+# Specify custom deployment settings for each agent
+
+# Default settings are applied to all agents unless overridden
+default:
+  memory_limit: "512m"
+  cpu_limit: "0.5"
+  restart_policy: "always"
+  health_check_interval: 30
+  timeout: 60
+  replicas: 1
+
+# Agent-specific configurations
+coding:
+  memory_limit: "1g"      # More memory for code processing
+  cpu_limit: "1.0"        # More CPU for compilation/analysis
+  timeout: 120
+  replicas: 2             # Scale for coding workloads
+  
+research:
+  memory_limit: "768m"    # More memory for data processing
+  cpu_limit: "0.7"
+  timeout: 180            # Longer timeout for research
+  replicas: 2
+  
+analysis:
+  memory_limit: "1g"      # High memory for data analysis
+  cpu_limit: "1.0"
+  timeout: 150
+  replicas: 1
+  
+writing:
+  memory_limit: "512m"
+  cpu_limit: "0.5"
+  timeout: 90
+  replicas: 1
+  
+creative:
+  memory_limit: "768m"    # More memory for creative processing
+  cpu_limit: "0.8"
+  timeout: 120
+  replicas: 1
+  
+planning:
+  memory_limit: "512m"
+  cpu_limit: "0.5"
+  timeout: 90
+  replicas: 1
+  
+problem_solving:
+  memory_limit: "1g"      # High resources for complex problem solving
+  cpu_limit: "1.0"
+  timeout: 200
+  replicas: 1
+  
+communication:
+  memory_limit: "512m"
+  cpu_limit: "0.5"
+  timeout: 60
+  replicas: 2             # Scale for communication workloads
+  
+math:
+  memory_limit: "768m"    # More memory for mathematical computations
+  cpu_limit: "0.8"
+  timeout: 120
+  replicas: 1
+  
+learning:
+  memory_limit: "512m"
+  cpu_limit: "0.5"
+  timeout: 90
+  replicas: 1
+  
+business:
+  memory_limit: "512m"
+  cpu_limit: "0.5"
+  timeout: 90
+  replicas: 1
+  
+health:
+  memory_limit: "512m"
+  cpu_limit: "0.5"
+  timeout: 60
+  replicas: 1
+  
+legal:
+  memory_limit: "512m"
+  cpu_limit: "0.5"
+  timeout: 90
+  replicas: 1
+  
+technical:
+  memory_limit: "768m"    # More memory for technical processing
+  cpu_limit: "0.7"
+  timeout: 120
+  replicas: 2
