@@ -7,6 +7,7 @@ import logging
 import time
 import os
 from dotenv import load_dotenv
+from agents.agent_registry import get_registry, discover_agents
 
 # Load environment variables from .env file
 load_dotenv()
@@ -16,6 +17,10 @@ app = Flask(__name__)
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Initialize agent registry and discover default agents
+agent_registry = get_registry()
+discover_agents(["agents/implementations"])
 
 # Initialize database
 def init_database():
@@ -1760,49 +1765,11 @@ Remember: You are a BUILDER, not just an advisor. Create actual working solution
     return Response(generate(), mimetype='text/event-stream')
 
 def auto_detect_agents(message):
-    """Auto-detect which agents are relevant to the user's request"""
-    message_lower = message.lower()
-    relevant_agents = []
-    
-    # Simple keyword-based detection (in a real system, this would use AI)
-    if any(word in message_lower for word in ['code', 'program', 'debug', 'software', 'function']):
-        relevant_agents.append('coding')
-    if any(word in message_lower for word in ['research', 'find', 'information', 'data']):
-        relevant_agents.append('research')
-    if any(word in message_lower for word in ['analyze', 'analysis', 'insights', 'trends']):
-        relevant_agents.append('analysis')
-    if any(word in message_lower for word in ['write', 'content', 'document', 'article']):
-        relevant_agents.append('writing')
-    if any(word in message_lower for word in ['plan', 'strategy', 'project', 'organize']):
-        relevant_agents.append('planning')
-    if any(word in message_lower for word in ['problem', 'error', 'fix', 'issue']):
-        relevant_agents.append('debugging')
-    if any(word in message_lower for word in ['creative', 'design', 'idea', 'art']):
-        relevant_agents.append('creative')
-    if any(word in message_lower for word in ['learn', 'explain', 'teach', 'education']):
-        relevant_agents.append('learning')
-    if any(word in message_lower for word in ['communicate', 'summarize', 'explain']):
-        relevant_agents.append('communication')
-    if any(word in message_lower for word in ['optimize', 'improve', 'performance', 'efficient']):
-        relevant_agents.append('optimization')
-    if any(word in message_lower for word in ['security', 'secure', 'vulnerability']):
-        relevant_agents.append('security')
-    if any(word in message_lower for word in ['test', 'testing', 'validate']):
-        relevant_agents.append('testing')
-    if any(word in message_lower for word in ['document', 'docs', 'manual']):
-        relevant_agents.append('documentation')
-    if any(word in message_lower for word in ['api', 'integrate', 'connect', 'system']):
-        relevant_agents.append('integration')
-    
-    # Special handling for visualization requests
-    if any(word in message_lower for word in ['visualization', 'visualize', 'chart', 'graph', 'map', 'plot', 'dashboard']):
-        relevant_agents = ['analysis', 'coding', 'creative']
-    
-    # Default to communication agent if no specific agents detected
-    if not relevant_agents:
-        relevant_agents = ['communication']
-    
-    return relevant_agents
+    """Auto-detect relevant agents using the global registry"""
+    selected = agent_registry.auto_select_agents(message)
+    if not selected:
+        selected = ['communication']
+    return selected
 
 def save_conversation(user_input, response, conversation_id):
     """Save conversation to database"""
