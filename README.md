@@ -7,6 +7,7 @@ JuniorGPT is a secure, modular multi-agent AI assistant that combines the power 
 ## ✨ Key Improvements
 
 ### 🔒 Security Enhancements
+
 - **Environment-based configuration** - No more hardcoded API keys
 - **Input sanitization** - XSS protection with HTML sanitization
 - **CSRF protection** - Token-based request validation
@@ -15,6 +16,7 @@ JuniorGPT is a secure, modular multi-agent AI assistant that combines the power 
 - **Secure logging** - Sensitive data filtering in logs
 
 ### 🏗️ Architecture Improvements
+
 - **Modular design** - Separated concerns into services, models, and utilities
 - **Database ORM** - SQLAlchemy with proper relationships and migrations
 - **Async support** - Asynchronous processing for better performance
@@ -22,6 +24,7 @@ JuniorGPT is a secure, modular multi-agent AI assistant that combines the power 
 - **Configuration management** - Environment-based settings with validation
 
 ### 📊 Enhanced Features
+
 - **Performance tracking** - Agent execution metrics and response times
 - **Conversation management** - Advanced search, tagging, and archiving
 - **Real-time thinking traces** - Visual agent thinking process
@@ -31,6 +34,7 @@ JuniorGPT is a secure, modular multi-agent AI assistant that combines the power 
 ## 🛠️ Installation
 
 ### Prerequisites
+
 - Python 3.8+
 - Ollama (for local models) - optional
 - OpenAI API key
@@ -39,17 +43,20 @@ JuniorGPT is a secure, modular multi-agent AI assistant that combines the power 
 ### Quick Start
 
 1. **Clone and setup**
+
    ```bash
    cd juniorgpt
    pip install -r requirements.txt
    ```
 
 2. **Set up security (generates secure Flask secret key)**
+
    ```bash
    python setup_security.py
    ```
 
 3. **Configure environment**
+
    ```bash
    # .env file is created automatically by security setup
    # Edit .env with your API keys:
@@ -58,6 +65,7 @@ JuniorGPT is a secure, modular multi-agent AI assistant that combines the power 
    ```
 
 4. **Initialize database**
+
    ```bash
    python migrate.py --migrate  # If upgrading from old version
    # OR
@@ -65,6 +73,7 @@ JuniorGPT is a secure, modular multi-agent AI assistant that combines the power 
    ```
 
 5. **Run the application**
+
    ```bash
    # For plugin-based architecture (recommended):
    python app_plugin.py
@@ -74,7 +83,7 @@ JuniorGPT is a secure, modular multi-agent AI assistant that combines the power 
    ```
 
 6. **Access the interface**
-   - Open http://localhost:7860 in your browser
+   - Open <http://localhost:7860> in your browser
    - Start chatting with your AI assistants!
 
 ## 🔧 Configuration
@@ -129,6 +138,7 @@ The system includes 14 specialized agents:
 ## 📖 API Reference
 
 ### Chat Endpoint
+
 ```http
 POST /api/chat
 Content-Type: application/json
@@ -141,12 +151,14 @@ X-CSRF-Token: <token>
 ```
 
 ### Agent Management
+
 ```http
 GET /api/agents
 POST /api/agents/toggle
 ```
 
 ### System Health
+
 ```http
 GET /api/health
 GET /api/stats
@@ -155,6 +167,7 @@ GET /api/stats
 ## 🚀 Usage Examples
 
 ### Basic Chat
+
 ```python
 import requests
 
@@ -171,6 +184,7 @@ print(result['response'])
 ```
 
 ### Agent Toggle
+
 ```python
 requests.post('http://localhost:7860/api/agents/toggle',
     json={
@@ -186,16 +200,19 @@ requests.post('http://localhost:7860/api/agents/toggle',
 If upgrading from the original `web_juniorgpt.py`:
 
 1. **Backup your data**
+
    ```bash
    cp data/conversations.db data/conversations.db.backup
    ```
 
 2. **Run migration**
+
    ```bash
    python migrate.py --migrate
    ```
 
 3. **Verify migration**
+
    ```bash
    python app.py
    # Check that your conversations are preserved
@@ -204,17 +221,20 @@ If upgrading from the original `web_juniorgpt.py`:
 ## 📊 Database Schema
 
 ### Conversations
+
 - Enhanced conversation tracking with metadata
 - Tagging and archiving support
 - Performance metrics
 - User feedback integration
 
 ### Agents
+
 - Agent configuration storage
 - Performance tracking
 - Execution history
 
 ### Agent Executions
+
 - Detailed execution logs
 - Performance metrics
 - Error tracking
@@ -232,17 +252,20 @@ python -m pytest tests/ --cov=. --cov-report=html
 ## 📈 Monitoring
 
 ### Health Checks
+
 - Database connectivity
 - Model availability
 - System resources
 
 ### Performance Metrics
+
 - Response times
 - Agent usage statistics
 - Error rates
 - Token usage
 
 ### Logging
+
 - Structured logging with security filtering
 - Separate error logs
 - Configurable log levels
@@ -250,24 +273,28 @@ python -m pytest tests/ --cov=. --cov-report=html
 ## 🔒 Security Best Practices
 
 ### Automated Security Setup
+
 ```bash
 # One-command security setup
 python setup_security.py
 ```
 
 This automatically:
+
 - Generates cryptographically secure Flask secret key (64 characters)
 - Creates/updates .env file with secure defaults
 - Validates security configuration
 - Creates security checklist
 
 ### Manual Security Setup
+
 ```bash
 # Generate secure secret key only
 python generate_secret_key.py
 ```
 
 ### Security Guidelines
+
 1. **Never commit API keys** - Use environment variables only
 2. **Secure secret keys** - Use 32+ character cryptographically random keys
 3. **Regular security updates** - Keep dependencies updated  
@@ -277,6 +304,7 @@ python generate_secret_key.py
 7. **Environment separation** - Different keys for dev/staging/production
 
 ### Security Documentation
+
 - 📋 **[Complete Security Setup Guide](SECURITY_SETUP_README.md)** - Comprehensive security documentation
 - ✅ **[Security Checklist](SECURITY_CHECKLIST.md)** - Generated security checklist (created after running `setup_security.py`)
 
@@ -313,18 +341,21 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## 🔮 Roadmap
 
 ### Short Term
+
 - [ ] WebSocket support for real-time streaming
 - [ ] Advanced rate limiting with Redis
 - [ ] User authentication and authorization
 - [ ] API key management interface
 
 ### Medium Term
+
 - [ ] Multi-tenant support
 - [ ] Advanced analytics dashboard
 - [ ] Plugin system for custom agents
 - [ ] Docker containerization
 
 ### Long Term
+
 - [ ] Kubernetes deployment
 - [ ] Advanced ML model integration
 - [ ] Federation with other AI systems
@@ -351,4 +382,4 @@ curl http://localhost:7860/api/health
 tail -f logs/juniorgpt.log
 ```
 
-**Built with ❤️ for secure, scalable AI assistance**
+# Built with ❤️ for secure, scalable AI assistance

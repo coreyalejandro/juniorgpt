@@ -6,9 +6,10 @@ from datetime import datetime
 import logging
 import time
 import os
+from dotenv import load_dotenv
 from agents.agent_registry import get_registry, discover_agents
 from models import init_db
-from services import TeamService
+from services.team_service import TeamService
 
 
 # Load environment variables from .env file
@@ -24,13 +25,14 @@ def initialize_application():
     try:
         # Initialize persistent storage for teams
         init_db('sqlite:///data/teams.db')
+        global team_service
         team_service = TeamService()
 
         # Initialize conversation database
         # (Add necessary initialization code)
 
         # Initialize agent registry and discover default agents
-        agent_registry = get_registry()
+        get_registry()
         discover_agents(["agents/implementations"])
         
         # Initialize any additional databases
@@ -58,7 +60,107 @@ def init_database():
     conn.commit()
     conn.close()
 
-AGENTS = AGENT_CONFIGS
+# Agent configurations
+AGENTS = {
+    "research": {
+        "name": "🔍 Research Agent",
+        "description": "Deep research and information gathering",
+        "model": "gpt-4o-mini",
+        "active": True,
+        "thinking_style": "I analyze information systematically, gathering facts and cross-referencing sources..."
+    },
+    "coding": {
+        "name": "💻 Coding Agent", 
+        "description": "Software development and debugging",
+        "model": "claude-3-5-sonnet-20241022",
+        "active": True,
+        "thinking_style": "I write actual working code, build complete applications, and create runnable solutions. I focus on delivering executable code, not just explanations."
+    },
+    "analysis": {
+        "name": "📊 Analysis Agent",
+        "description": "Data analysis and insights",
+        "model": "gpt-4o-mini",
+        "active": True,
+        "thinking_style": "I create actual data visualizations, build analysis scripts, and generate working charts and graphs. I deliver concrete analytical outputs, not just descriptions."
+    },
+    "writing": {
+        "name": "✍️ Writing Agent",
+        "description": "Content creation and editing",
+        "model": "claude-3-5-sonnet-20241022",
+        "active": True,
+        "thinking_style": "I craft clear, engaging content with proper structure and flow..."
+    },
+    "planning": {
+        "name": "📋 Planning Agent",
+        "description": "Project planning and strategy",
+        "model": "gpt-4o-mini",
+        "active": True,
+        "thinking_style": "I break down complex projects into manageable steps and create strategic roadmaps..."
+    },
+    "debugging": {
+        "name": "🐛 Debugging Agent",
+        "description": "Problem solving and troubleshooting",
+        "model": "claude-3-5-sonnet-20241022",
+        "active": True,
+        "thinking_style": "I systematically identify root causes and develop systematic solutions..."
+    },
+    "creative": {
+        "name": "🎨 Creative Agent",
+        "description": "Creative ideation and design",
+        "model": "gpt-4o-mini",
+        "active": True,
+        "thinking_style": "I build actual creative projects, generate visual designs, and create working prototypes. I deliver tangible creative outputs, not just concepts."
+    },
+    "learning": {
+        "name": "📚 Learning Agent",
+        "description": "Educational content and explanations",
+        "model": "claude-3-5-sonnet-20241022",
+        "active": True,
+        "thinking_style": "I structure information for optimal learning and understanding..."
+    },
+    "communication": {
+        "name": "💬 Communication Agent",
+        "description": "Clear communication and summaries",
+        "model": "gpt-4o-mini",
+        "active": True,
+        "thinking_style": "I create actual communication materials, build presentation tools, and generate working content. I deliver concrete communication outputs, not just advice."
+    },
+    "optimization": {
+        "name": "⚡ Optimization Agent",
+        "description": "Performance and efficiency improvements",
+        "model": "claude-3-5-sonnet-20241022",
+        "active": True,
+        "thinking_style": "I identify bottlenecks and optimize for maximum efficiency and performance..."
+    },
+    "security": {
+        "name": "🔒 Security Agent",
+        "description": "Security analysis and recommendations",
+        "model": "gpt-4o-mini",
+        "active": True,
+        "thinking_style": "I assess security risks and vulnerabilities with a security-first mindset..."
+    },
+    "testing": {
+        "name": "🧪 Testing Agent",
+        "description": "Testing strategies and validation",
+        "model": "claude-3-5-sonnet-20241022",
+        "active": True,
+        "thinking_style": "I design comprehensive test strategies to ensure quality and reliability..."
+    },
+    "documentation": {
+        "name": "📖 Documentation Agent",
+        "description": "Documentation and technical writing",
+        "model": "gpt-4o-mini",
+        "active": True,
+        "thinking_style": "I create clear, comprehensive documentation that serves user needs..."
+    },
+    "integration": {
+        "name": "🔗 Integration Agent",
+        "description": "System integration and APIs",
+        "model": "claude-3-5-sonnet-20241022",
+        "active": True,
+        "thinking_style": "I design seamless integrations and API architectures..."
+    }
+}
 
 HTML_TEMPLATE = '''
 <!DOCTYPE html>
@@ -1493,7 +1595,7 @@ HTML_TEMPLATE = '''
             const thinkingContent = document.getElementById('thinkingContent');
             const traceDiv = document.createElement('div');
             traceDiv.className = 'thinking-trace';
-            traceDiv.id = 'thinking-' + agentName.replace(/\s+/g, '-').toLowerCase();
+            traceDiv.id = 'thinking-' + agentName.replace(/\\s+/g, '-').toLowerCase();
             
             traceDiv.innerHTML = `
                 <div class="thinking-agent">${agentName}</div>
@@ -1505,7 +1607,7 @@ HTML_TEMPLATE = '''
         }
         
         function updateThinkingTrace(agentName, thinking) {
-            const traceId = 'thinking-' + agentName.replace(/\s+/g, '-').toLowerCase();
+            const traceId = 'thinking-' + agentName.replace(/\\s+/g, '-').toLowerCase();
             let traceDiv = document.getElementById(traceId);
             
             if (!traceDiv) {
@@ -1745,53 +1847,53 @@ def stream_chat():
     auto_mode = request.args.get('auto_mode', 'true').lower() == 'true'
     conversation_id = request.args.get('conversation_id', '')
 
-# Parse team ID and selected agents from query parameters with error handling
-team_id = request.args.get('team_id')
+    # Parse team ID and selected agents from query parameters with error handling
+    team_id = request.args.get('team_id')
 
-# Initialize selected_agents to an empty list
-selected_agents = []
+    # Initialize selected_agents to an empty list
+    selected_agents = []
 
-# Attempt to parse selected agents, with error handling
-try:
-    selected_agents = json.loads(request.args.get('selected_agents', '[]'))
-    if not isinstance(selected_agents, list):
-        logger.error("selected_agents parameter is not a list")
-        selected_agents = []
-except json.JSONDecodeError as e:
-    logger.error(f"Error parsing selected_agents: {e}")
+    # Attempt to parse selected agents, with error handling
+    try:
+        selected_agents = json.loads(request.args.get('selected_agents', '[]'))
+        if not isinstance(selected_agents, list):
+            logger.error("selected_agents parameter is not a list")
+            selected_agents = []
+    except json.JSONDecodeError as e:
+        logger.error(f"Error parsing selected_agents: {e}")
 
-# If team_id is provided, retrieve agents from the team
-if team_id:
-    team = team_service.get_team(team_id)
-    if team and team.get('agents'):
-        selected_agents = team['agents']
+    # If team_id is provided, retrieve agents from the team
+    if team_id:
+        team = team_service.get_team(team_id)
+        if team and team.get('agents'):
+            selected_agents = team['agents']
 
-# Set auto_mode to False if valid team agents are found
-auto_mode = not bool(selected_agents)
+    # Set auto_mode to False if valid team agents are found
+    auto_mode = not bool(selected_agents)
+
     # Generate new conversation ID if not provided
     if not conversation_id:
         conversation_id = datetime.now().strftime('%Y%m%d_%H%M%S')
 
     def generate():
         try:
-
-    # Determine which agents to use
-if auto_mode:
-    agents_to_use = auto_detect_agents(message)
-else:
-    # Use selected agents if provided; fallback to default agent if not
-    agents_to_use = selected_agents if selected_agents else [next(iter(AGENTS))]
-    
-    if not selected_agents:
-        logger.info("No selected_agents provided; falling back to default agent")
+            # Determine which agents to use
+            if auto_mode:
+                agents_to_use = auto_detect_agents(message)
+            else:
+                # Use selected agents if provided; fallback to default agent if not
+                agents_to_use = selected_agents if selected_agents else [next(iter(AGENTS))]
+                
+                if not selected_agents:
+                    logger.info("No selected_agents provided; falling back to default agent")
 
             # Process with each agent in real-time
             final_response = ""
             agents_used = []
 
-    # Use the selected agents or auto-detected agents
-for agent_id in agents_to_use:
-    # Process each agent_id as needed
+            # Use the selected agents or auto-detected agents
+            for agent_id in agents_to_use:
+                # Process each agent_id as needed
                 if agent_id in AGENTS:
                     agent = AGENTS[agent_id]
                     agents_used.append(agent['name'])
