@@ -442,6 +442,33 @@ HTML_TEMPLATE = '''
             margin-bottom: 0;
         }
         
+        .copy-button {
+            background: #40414f;
+            border: 1px solid #565869;
+            color: #8e8ea0;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 8px;
+            transition: all 0.2s ease;
+        }
+        
+        .copy-button:hover {
+            background: #565869;
+            color: #ffffff;
+            border-color: #8e8ea0;
+        }
+        
+        .copy-button.copied {
+            background: #19c37d;
+            color: #ffffff;
+            border-color: #19c37d;
+        }
+        
         .message-attachments {
             margin-top: 12px;
             display: flex;
@@ -1550,12 +1577,27 @@ HTML_TEMPLATE = '''
                 attachmentsHtml += '</div>';
             }
             
+            // Add copy button for assistant messages
+            let copyButton = '';
+            if (!isUser && content) {
+                copyButton = `
+                    <button class="copy-button" onclick="copyToClipboard(this, \`${content.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`)">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                        </svg>
+                        Copy
+                    </button>
+                `;
+            }
+            
             messageDiv.innerHTML = `
                 <div class="message-avatar ${avatarClass}">${avatar}</div>
                 <div class="message-content">
                     ${agentIndicator}
                     <p>${content || ''}</p>
                     ${attachmentsHtml}
+                    ${copyButton}
                 </div>
             `;
             
@@ -1733,6 +1775,30 @@ HTML_TEMPLATE = '''
                 closeSettings();
             }
         });
+        
+        // Copy to clipboard function
+        function copyToClipboard(button, text) {
+            navigator.clipboard.writeText(text).then(function() {
+                // Change button text temporarily
+                const originalText = button.innerHTML;
+                button.innerHTML = `
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="20,6 9,17 4,12"></polyline>
+                    </svg>
+                    Copied!
+                `;
+                button.classList.add('copied');
+                
+                // Reset after 2 seconds
+                setTimeout(function() {
+                    button.innerHTML = originalText;
+                    button.classList.remove('copied');
+                }, 2000);
+            }).catch(function(err) {
+                console.error('Failed to copy: ', err);
+                alert('Failed to copy to clipboard');
+            });
+        }
     </script>
 </body>
 </html>
