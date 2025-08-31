@@ -116,7 +116,7 @@ def init_db(database_url: str, echo: bool = False):
     db.init_app(database_url, echo)
     
     # Import all models to ensure they're registered
-    from . import conversation, agent
+    from . import conversation, agent, team
     
     # Create tables
     db.create_all()
