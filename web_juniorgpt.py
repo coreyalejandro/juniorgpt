@@ -132,28 +132,28 @@ AGENTS = {
         "description": "Deep research and information gathering",
         "model": "gpt-4o-mini",
         "active": True,
-        "thinking_style": "I analyze information systematically, gathering facts and cross-referencing sources..."
+        "thinking_style": "I create specific research files: data_collection.py, analysis_script.py, research_report.md. I build working tools, not provide information."
     },
     "coding": {
         "name": "💻 Coding Agent", 
         "description": "Software development and debugging",
         "model": "claude-3-5-sonnet-20241022",
         "active": True,
-        "thinking_style": "I write actual working code, build complete applications, and create runnable solutions. I focus on delivering executable code, not just explanations."
+        "thinking_style": "I create specific application files: main.py, app.js, index.html, styles.css. I build working applications, not provide explanations."
     },
     "analysis": {
         "name": "📊 Analysis Agent",
         "description": "Data analysis and insights",
         "model": "gpt-4o-mini",
         "active": True,
-        "thinking_style": "I create actual data visualizations, build analysis scripts, and generate working charts and graphs. I deliver concrete analytical outputs, not just descriptions."
+        "thinking_style": "I create specific analysis files: data_analysis.py, visualization.html, charts.js. I build working visualizations, not provide descriptions."
     },
     "writing": {
         "name": "✍️ Writing Agent",
         "description": "Content creation and editing",
         "model": "claude-3-5-sonnet-20241022",
         "active": True,
-        "thinking_style": "I craft clear, engaging content with proper structure and flow..."
+        "thinking_style": "I create specific document files: content.md, report.txt, presentation.html. I build working documents, not provide advice."
     },
     "planning": {
         "name": "📋 Planning Agent",
@@ -2518,22 +2518,56 @@ def stream_chat():
                         
                         enhanced_prompt = f"""You are {agent['name']}. {agent['description']}. {agent['thinking_style']}
 
-CRITICAL INSTRUCTION: You are an ACTION-ORIENTED agent. When users ask you to create, build, or generate something, you MUST provide actual working code, files, or deliverables - NOT just instructions or explanations. Always default to building the actual thing requested.
-
 RECENT INTERNET SEARCH RESULTS:
 {search_results}
 
 USER REQUEST: {message}
 
-RESPONSE REQUIREMENTS:
-1. If the user asks for code, applications, visualizations, or any deliverables - PROVIDE THE ACTUAL WORKING CODE/FILES
-2. Write complete, runnable code with all necessary imports and dependencies
-3. Include sample data when needed
-4. Provide working examples that users can execute immediately
-5. Do NOT just give instructions - BUILD THE ACTUAL THING
-6. If you cannot build something due to limitations, clearly state what you CAN build and provide that instead
+DETERMINISTIC BUILDING TASK:
+Based on the user request, you must create specific files. Follow this exact structure:
 
-Remember: You are a BUILDER, not just an advisor. Create actual working solutions."""
+1. ANALYZE the request to determine what files need to be created
+2. CREATE each required file with complete, working code
+3. USE proper file extensions (.html, .css, .js, .py, .md, etc.)
+4. INCLUDE all necessary imports and dependencies
+5. PROVIDE sample data when needed
+
+RESPONSE FORMAT:
+For each file you create, use this exact format:
+
+```filename.ext
+[Complete working code for this file]
+```
+
+EXAMPLE:
+If user asks for a website, create:
+```html
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Website</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <h1>Welcome</h1>
+    <script src="script.js"></script>
+</body>
+</html>
+```
+
+```css
+body {{
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 20px;
+}}
+```
+
+```javascript
+console.log("Website loaded");
+```
+
+Create the actual files now."""
                         
                         # Get conversation history for context
                         conversation_history = get_conversation_history(conversation_id)
