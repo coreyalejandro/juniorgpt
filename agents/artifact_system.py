@@ -1657,7 +1657,7 @@ class AdvancedArtifactManager:
         # Use first line if it looks like a title
         first_line = content.split('\n')[0].strip()
         if len(first_line) < 50 and not any(char in first_line for char in "{}()[]"):
-            return first_line.lstrip('#').strip() or f"generated_file"
+            return first_line.lstrip('#').strip() or "generated_file"
         
         return "generated_file"
     
