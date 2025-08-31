@@ -1895,12 +1895,12 @@ Remember: You are a BUILDER, not just an advisor. Create actual working solution
     
     return Response(generate(), mimetype='text/event-stream')
 
-def auto_detect_agents(message):
-
-    """Auto-detect relevant agents using the global registry"""
-    selected = agent_registry.auto_select_agents(message)
+def auto_detect_agents(message: str):
+    """Select appropriate agents for a message using the global registry."""
+    registry = get_registry()
+    selected = registry.auto_select_agents(message)
     if not selected:
-        selected = ['communication']
+        selected = ["communication"]
     return selected
   
 
