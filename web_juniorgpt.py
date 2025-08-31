@@ -1833,34 +1833,54 @@ def stream_chat():
     message = request.args.get('message', '')
     auto_mode = request.args.get('auto_mode', 'true').lower() == 'true'
     conversation_id = request.args.get('conversation_id', '')
-    team_id = request.args.get('team_id')
 
-    try:
-        selected_agents = json.loads(request.args.get('selected_agents', '[]'))
-    except Exception:
+# Parse team ID and selected agents from query parameters with error handling
+team_id = request.args.get('team_id')
+
+# Initialize selected_agents to an empty list
+selected_agents = []
+
+# Attempt to parse selected agents, with error handling
+try:
+    selected_agents = json.loads(request.args.get('selected_agents', '[]'))
+    if not isinstance(selected_agents, list):
+        logger.error("selected_agents parameter is not a list")
         selected_agents = []
+except json.JSONDecodeError as e:
+    logger.error(f"Error parsing selected_agents: {e}")
 
-    if team_id:
-        team = team_service.get_team(team_id)
-        if team and team.get('agents'):
-            selected_agents = team['agents']
-            auto_mode = False
+# If team_id is provided, retrieve agents from the team
+if team_id:
+    team = team_service.get_team(team_id)
+    if team and team.get('agents'):
+        selected_agents = team['agents']
 
+# Set auto_mode to False if valid team agents are found
+auto_mode = not bool(selected_agents)
     # Generate new conversation ID if not provided
     if not conversation_id:
         conversation_id = datetime.now().strftime('%Y%m%d_%H%M%S')
 
     def generate():
         try:
-            agents_list = selected_agents
-            if auto_mode:
-                agents_list = auto_detect_agents(message)
+
+    # Determine which agents to use
+if auto_mode:
+    agents_to_use = auto_detect_agents(message)
+else:
+    # Use selected agents if provided; fallback to default agent if not
+    agents_to_use = selected_agents if selected_agents else [next(iter(AGENTS))]
+    
+    if not selected_agents:
+        logger.info("No selected_agents provided; falling back to default agent")
 
             # Process with each agent in real-time
             final_response = ""
             agents_used = []
 
-            for agent_id in agents_list:
+    # Use the selected agents or auto-detected agents
+for agent_id in agents_to_use:
+    # Process each agent_id as needed
                 if agent_id in AGENTS:
                     agent = AGENTS[agent_id]
                     agents_used.append(agent['name'])
