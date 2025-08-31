@@ -14,31 +14,19 @@ level of sophistication as Claude's artifact handling, including:
 import os
 import re
 import json
-import mimetypes
 import hashlib
 import base64
 import ast
-import subprocess
 import asyncio
 import threading
 import uuid
 import tempfile
-import shutil
-import zipfile
-import tarfile
-from typing import Dict, List, Any, Optional, Union, Tuple, Callable
+from typing import Dict, List, Any, Optional, Callable
 from dataclasses import dataclass, asdict, field
 from datetime import datetime, timedelta
 from pathlib import Path
 from enum import Enum
 import logging
-import weakref
-from concurrent.futures import ThreadPoolExecutor, as_completed
-import difflib
-import sqlite3
-import pickle
-import hashlib
-import secrets
 import time
 
 logger = logging.getLogger('juniorgpt.artifact_system')
@@ -498,7 +486,7 @@ class Artifact:
                 return self._calculate_python_complexity()
             else:
                 return self._calculate_general_code_complexity()
-        except:
+        except Exception:
             return self._calculate_general_complexity()
     
     def _calculate_python_complexity(self) -> float:
@@ -550,7 +538,6 @@ class Artifact:
     
     def _calculate_document_complexity(self) -> float:
         """Calculate document complexity"""
-        lines = len(self.content.splitlines())
         words = len(self.content.split())
         
         # Headers, lists, links, images
@@ -605,7 +592,6 @@ class Artifact:
             quality += 0.5
         
         # Penalize very long functions/methods
-        long_functions = len(re.findall(r'def\s+\w+.*?(?=\ndef|\nclass|\Z)', self.content, re.DOTALL))
         if any(len(func.splitlines()) > 50 for func in re.findall(r'def\s+\w+.*?(?=\ndef|\nclass|\Z)', self.content, re.DOTALL)):
             quality -= 1.0
         
@@ -1048,7 +1034,6 @@ class Artifact:
         new_version = '.'.join(version_parts)
         
         # Update content and metadata
-        old_content = self.content
         self.content = new_content
         self.current_version = new_version
         self.metadata.updated_at = datetime.utcnow()
@@ -1312,7 +1297,6 @@ class Artifact:
             
             # In production, this would use a sandboxed executor
             import io
-            import sys
             from contextlib import redirect_stdout, redirect_stderr
             
             stdout = io.StringIO()
@@ -1675,7 +1659,7 @@ class AdvancedArtifactManager:
         if len(first_line) < 50 and not any(char in first_line for char in "{}()[]"):
             return first_line.lstrip('#').strip() or f"generated_file"
         
-        return f"generated_file"
+        return "generated_file"
     
     def _extract_description_from_content(self, content: str, language: str) -> str:
         """Extract description from content"""
@@ -1779,7 +1763,7 @@ class AdvancedArtifactManager:
         # Determine config type
         if text.strip().startswith('{') and text.strip().endswith('}'):
             artifact_type = ArtifactType.DATA_JSON
-        elif ':' in text and not '=' in text:
+        elif ':' in text and '=' not in text:
             artifact_type = ArtifactType.CODE_YAML
         else:
             artifact_type = ArtifactType.CONFIG_ENV
