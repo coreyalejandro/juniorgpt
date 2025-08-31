@@ -1640,22 +1640,36 @@ def stream_chat():
     message = request.args.get('message', '')
     auto_mode = request.args.get('auto_mode', 'true').lower() == 'true'
     conversation_id = request.args.get('conversation_id', '')
-    
+
+    # Parse selected agents from query parameters with error handling
+    try:
+        selected_agents = json.loads(request.args.get("selected_agents", "[]"))
+        if not isinstance(selected_agents, list):
+            logger.error("selected_agents parameter is not a list")
+            selected_agents = []
+    except json.JSONDecodeError as e:
+        logger.error(f"Error parsing selected_agents: {e}")
+        selected_agents = []
+
     # Generate new conversation ID if not provided
     if not conversation_id:
         conversation_id = datetime.now().strftime('%Y%m%d_%H%M%S')
-    
+
     def generate():
         try:
-            # Auto-detect agents if in auto mode
+            # Determine which agents to use
             if auto_mode:
-                selected_agents = auto_detect_agents(message)
-            
+                agents_to_use = auto_detect_agents(message)
+            else:
+                agents_to_use = selected_agents or [next(iter(AGENTS))]
+                if not selected_agents:
+                    logger.info("No selected_agents provided; falling back to default agent")
+
             # Process with each agent in real-time
             final_response = ""
             agents_used = []
-            
-            for agent_id in selected_agents:
+
+            for agent_id in agents_to_use:
                 if agent_id in AGENTS:
                     agent = AGENTS[agent_id]
                     agents_used.append(agent['name'])
