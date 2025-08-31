@@ -12,21 +12,27 @@ JuniorGPT now uses a revolutionary plugin-based architecture where each agent is
 ## 🏗️ Architecture Principles
 
 ### Self-Contained Design
+
 Each agent is a complete application with:
+
 - Its own dependencies and configuration
 - Standardized interface for communication
 - Independent execution capability
 - Built-in error handling and logging
 
 ### Plugin Interface
+
 All agents implement the `BaseAgent` interface:
+
 - Standardized request/response format
 - Capability detection system
 - Health monitoring
 - Performance metrics
 
 ### Dynamic Loading
+
 Agents can be:
+
 - Discovered automatically
 - Loaded at runtime
 - Hot-swapped without restart
@@ -272,6 +278,7 @@ def can_handle(self, message: str, context: Dict[str, Any] = None) -> float:
 ```
 
 ### Scoring Guidelines
+
 - **0.9-1.0**: Perfect match, this agent should definitely handle it
 - **0.7-0.8**: Strong match, good candidate
 - **0.5-0.6**: Moderate match, could handle it
@@ -308,6 +315,7 @@ async def process(self, message: str, context: Dict[str, Any] = None) -> AgentRe
 ### 1. Agent Design
 
 **Do:**
+
 - Keep agents focused on specific domains
 - Use clear, descriptive names with emojis
 - Provide detailed capability descriptions
@@ -315,6 +323,7 @@ async def process(self, message: str, context: Dict[str, Any] = None) -> AgentRe
 - Add meaningful thinking traces
 
 **Don't:**
+
 - Create overly broad "do everything" agents
 - Use generic names like "Helper Agent"
 - Skip input validation
@@ -324,12 +333,14 @@ async def process(self, message: str, context: Dict[str, Any] = None) -> AgentRe
 ### 2. Performance
 
 **Optimize for:**
+
 - Fast startup time
 - Efficient memory usage
 - Quick capability detection
 - Minimal dependencies
 
 **Avoid:**
+
 - Heavy initialization in `__init__`
 - Loading large models unnecessarily
 - Complex regex in `can_handle`
@@ -338,12 +349,14 @@ async def process(self, message: str, context: Dict[str, Any] = None) -> AgentRe
 ### 3. User Experience
 
 **Provide:**
+
 - Clear, helpful responses
 - Appropriate response length
 - Actionable information
 - Professional tone
 
 **Avoid:**
+
 - Overly technical jargon
 - Extremely long responses
 - Vague or unhelpful content
@@ -517,7 +530,7 @@ def check_api_connection(self) -> bool:
 
 ### 1. Package Structure
 
-```
+```text
 my_agent/
 ├── agent.json          # Manifest
 ├── my_agent_agent.py   # Main code
@@ -832,7 +845,8 @@ class AIWriterAgent(BaseAgent):
 
 ### Common Issues
 
-**1. Agent Not Loading**
+#### 1. Agent Not Loading
+
 ```bash
 # Check manifest syntax
 python -m json.tool agent.json
@@ -844,7 +858,8 @@ python tools/agent_cli.py test my_agent/
 pip install -r requirements.txt
 ```
 
-**2. Import Errors**
+#### 2. Import Errors
+
 ```python
 # Ensure proper imports in agent file
 import sys
@@ -854,7 +869,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from agents.base_agent import BaseAgent, AgentResponse, AgentConfig, AgentStatus
 ```
 
-**3. Capability Detection Not Working**
+#### 3. Capability Detection Not Working
+
 ```python
 def can_handle(self, message: str, context: Dict[str, Any] = None) -> float:
     # Debug capability detection
@@ -868,7 +884,8 @@ def can_handle(self, message: str, context: Dict[str, Any] = None) -> float:
     return final_score
 ```
 
-**4. Model Service Not Available**
+#### 4. Model Service Not Available
+
 ```python
 async def process(self, message: str, context: Dict[str, Any] = None) -> AgentResponse:
     if not self.model_service:
@@ -882,13 +899,15 @@ async def process(self, message: str, context: Dict[str, Any] = None) -> AgentRe
 
 ### Debug Tools
 
-**Enable Verbose Logging**
+#### Enable Verbose Logging
+
 ```python
 import logging
 logging.basicConfig(level=logging.DEBUG)
 ```
 
-**Test Individual Components**
+#### Test Individual Components
+
 ```python
 # Test capability detection
 agent = MyAgent()
@@ -901,7 +920,8 @@ print(agent.config.__dict__)
 print(agent.get_capabilities())
 ```
 
-**Profile Performance**
+#### Profile Performance
+
 ```python
 import time
 
@@ -913,18 +933,21 @@ print(f"Execution time: {time.time() - start:.2f}s")
 ## 📞 Support and Community
 
 ### Getting Help
+
 - Check the troubleshooting section above
 - Review existing agent examples
 - Test with the CLI tool first
 - Check logs for error messages
 
 ### Contributing
+
 - Follow the coding standards
 - Add comprehensive tests
 - Update documentation
 - Submit clear pull requests
 
 ### Sharing Agents
+
 - Package agents properly
 - Include clear documentation
 - Add usage examples
@@ -935,6 +958,7 @@ print(f"Execution time: {time.time() - start:.2f}s")
 ## 🎯 Quick Reference
 
 ### CLI Commands
+
 ```bash
 # Create new agent
 python tools/agent_cli.py create "Agent Name"
@@ -956,6 +980,7 @@ python tools/agent_cli.py uninstall agent_id
 ```
 
 ### Required Imports
+
 ```python
 from agents.base_agent import BaseAgent, AgentResponse, AgentConfig, AgentStatus
 from typing import Dict, List, Any, Optional
@@ -963,6 +988,7 @@ import asyncio
 ```
 
 ### Minimal Agent Template
+
 ```python
 class MinimalAgent(BaseAgent):
     def __init__(self, model_service=None, logger=None):
@@ -991,7 +1017,8 @@ class MinimalAgent(BaseAgent):
 ```
 
 ### File Structure
-```
+
+```text
 my_agent/
 ├── agent.json              # Required manifest
 ├── my_agent_agent.py       # Required main module
