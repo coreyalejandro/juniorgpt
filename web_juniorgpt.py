@@ -1,4 +1,4 @@
-from flask import Flask, render_template_string, request, Response
+from flask import Flask, render_template_string, request, Response, jsonify
 import requests
 import json
 import sqlite3
@@ -47,21 +47,21 @@ AGENTS = {
     "coding": {
         "name": "💻 Coding Agent", 
         "description": "Software development and debugging",
-        "model": "claude-3-5-sonnet",
+        "model": "claude-3-5-sonnet-20241022",
         "active": True,
-        "thinking_style": "I think in code structures, considering best practices, patterns, and debugging approaches..."
+        "thinking_style": "I write actual working code, build complete applications, and create runnable solutions. I focus on delivering executable code, not just explanations."
     },
     "analysis": {
         "name": "📊 Analysis Agent",
         "description": "Data analysis and insights",
         "model": "gpt-4o-mini",
         "active": True,
-        "thinking_style": "I examine data patterns, identify trends, and extract meaningful insights..."
+        "thinking_style": "I create actual data visualizations, build analysis scripts, and generate working charts and graphs. I deliver concrete analytical outputs, not just descriptions."
     },
     "writing": {
         "name": "✍️ Writing Agent",
         "description": "Content creation and editing",
-        "model": "claude-3-5-sonnet",
+        "model": "claude-3-5-sonnet-20241022",
         "active": True,
         "thinking_style": "I craft clear, engaging content with proper structure and flow..."
     },
@@ -75,7 +75,7 @@ AGENTS = {
     "debugging": {
         "name": "🐛 Debugging Agent",
         "description": "Problem solving and troubleshooting",
-        "model": "claude-3-5-sonnet",
+        "model": "claude-3-5-sonnet-20241022",
         "active": True,
         "thinking_style": "I systematically identify root causes and develop systematic solutions..."
     },
@@ -84,12 +84,12 @@ AGENTS = {
         "description": "Creative ideation and design",
         "model": "gpt-4o-mini",
         "active": True,
-        "thinking_style": "I explore innovative ideas and creative solutions with artistic vision..."
+        "thinking_style": "I build actual creative projects, generate visual designs, and create working prototypes. I deliver tangible creative outputs, not just concepts."
     },
     "learning": {
         "name": "📚 Learning Agent",
         "description": "Educational content and explanations",
-        "model": "claude-3-5-sonnet",
+        "model": "claude-3-5-sonnet-20241022",
         "active": True,
         "thinking_style": "I structure information for optimal learning and understanding..."
     },
@@ -98,12 +98,12 @@ AGENTS = {
         "description": "Clear communication and summaries",
         "model": "gpt-4o-mini",
         "active": True,
-        "thinking_style": "I distill complex information into clear, accessible communication..."
+        "thinking_style": "I create actual communication materials, build presentation tools, and generate working content. I deliver concrete communication outputs, not just advice."
     },
     "optimization": {
         "name": "⚡ Optimization Agent",
         "description": "Performance and efficiency improvements",
-        "model": "claude-3-5-sonnet",
+        "model": "claude-3-5-sonnet-20241022",
         "active": True,
         "thinking_style": "I identify bottlenecks and optimize for maximum efficiency and performance..."
     },
@@ -117,7 +117,7 @@ AGENTS = {
     "testing": {
         "name": "🧪 Testing Agent",
         "description": "Testing strategies and validation",
-        "model": "claude-3-5-sonnet",
+        "model": "claude-3-5-sonnet-20241022",
         "active": True,
         "thinking_style": "I design comprehensive test strategies to ensure quality and reliability..."
     },
@@ -131,7 +131,7 @@ AGENTS = {
     "integration": {
         "name": "🔗 Integration Agent",
         "description": "System integration and APIs",
-        "model": "claude-3-5-sonnet",
+        "model": "claude-3-5-sonnet-20241022",
         "active": True,
         "thinking_style": "I design seamless integrations and API architectures..."
     }
@@ -233,6 +233,12 @@ HTML_TEMPLATE = '''
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+        }
+        
+        .conversation-meta {
+            font-size: 11px;
+            color: #8e8ea0;
+            margin-left: auto;
         }
         
         .sidebar-footer {
@@ -1002,7 +1008,7 @@ HTML_TEMPLATE = '''
                     </div>
                     <div class="model-category">
                         <h4>Anthropic Models</h4>
-                        <label class="model-checkbox"><input type="checkbox" value="claude-3-5-sonnet"> Claude 3.5 Sonnet (Balanced)</label>
+                        <label class="model-checkbox"><input type="checkbox" value="claude-3-5-sonnet-20241022"> Claude 3.5 Sonnet (Balanced)</label>
                         <label class="model-checkbox"><input type="checkbox" value="claude-3-haiku"> Claude 3 Haiku (Fast)</label>
                         <label class="model-checkbox"><input type="checkbox" value="claude-3-opus"> Claude 3 Opus (Most Capable)</label>
                     </div>
@@ -1028,7 +1034,7 @@ HTML_TEMPLATE = '''
         let attachments = [];
         let mediaRecorder = null;
         let audioChunks = [];
-        let agents = ''' + json.dumps(AGENTS) + ''';
+        let agents = ''' + json.dumps(AGENTS).replace('\\', '\\\\') + ''';
         
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
@@ -1271,31 +1277,55 @@ HTML_TEMPLATE = '''
         }
         
         function loadConversations() {
-            // This would load from localStorage or database
-            // For now, we'll use localStorage
-            const savedConversations = JSON.parse(localStorage.getItem('conversations') || '[]');
-            const conversationsList = document.getElementById('conversationsList');
-            
-            conversationsList.innerHTML = '';
-            savedConversations.forEach(conv => {
-                const convItem = document.createElement('div');
-                convItem.className = 'conversation-item';
-                convItem.onclick = () => loadConversation(conv.id);
-                convItem.innerHTML = `
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                    </svg>
-                    <div class="conversation-title">${conv.title}</div>
-                `;
-                conversationsList.appendChild(convItem);
-            });
+            // Load conversations from the database
+            fetch('/api/conversations')
+                .then(response => response.json())
+                .then(conversations => {
+                    const conversationsList = document.getElementById('conversationsList');
+                    conversationsList.innerHTML = '';
+                    
+                    conversations.forEach(conv => {
+                        const convItem = document.createElement('div');
+                        convItem.className = 'conversation-item';
+                        convItem.onclick = () => loadConversation(conv.id);
+                        convItem.innerHTML = `
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                            </svg>
+                            <div class="conversation-title">${conv.title}</div>
+                            <div class="conversation-meta">${conv.message_count} messages</div>
+                        `;
+                        conversationsList.appendChild(convItem);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error loading conversations:', error);
+                });
         }
         
         function loadConversation(conversationId) {
-            // This would load conversation from database
-            // For now, we'll just update the UI
+            // Load conversation messages from the database
             currentConversationId = conversationId;
-            document.getElementById('chatTitle').textContent = 'Previous conversation';
+            
+            // Clear current messages
+            document.getElementById('messagesContainer').innerHTML = '';
+            
+            fetch(`/api/conversations/${conversationId}`)
+                .then(response => response.json())
+                .then(messages => {
+                    messages.forEach(msg => {
+                        // Add user message
+                        addMessage(msg.user_input, true);
+                        
+                        // Add assistant response
+                        addMessage(msg.agent_response, false, msg.agents_used);
+                    });
+                    
+                    document.getElementById('chatTitle').textContent = 'Previous conversation';
+                })
+                .catch(error => {
+                    console.error('Error loading conversation:', error);
+                });
         }
         
         function saveConversation(title) {
@@ -1541,6 +1571,70 @@ HTML_TEMPLATE = '''
 def home():
     return render_template_string(HTML_TEMPLATE)
 
+@app.route('/api/conversations')
+def get_conversations():
+    """Get all conversations for the sidebar"""
+    try:
+        conn = sqlite3.connect('data/conversations.db')
+        cursor = conn.execute('''
+            SELECT DISTINCT conversation_id, 
+                   MIN(timestamp) as first_message,
+                   MAX(timestamp) as last_message,
+                   COUNT(*) as message_count
+            FROM conversations 
+            GROUP BY conversation_id 
+            ORDER BY last_message DESC
+        ''')
+        conversations = []
+        for row in cursor.fetchall():
+            conversation_id, first_msg, last_msg, count = row
+            # Get the first user message as title
+            title_cursor = conn.execute('''
+                SELECT user_input FROM conversations 
+                WHERE conversation_id = ? 
+                ORDER BY timestamp ASC LIMIT 1
+            ''', (conversation_id,))
+            title_row = title_cursor.fetchone()
+            title = title_row[0][:50] + "..." if title_row and len(title_row[0]) > 50 else (title_row[0] if title_row else "New Conversation")
+            
+            conversations.append({
+                'id': conversation_id,
+                'title': title,
+                'timestamp': last_msg,
+                'message_count': count
+            })
+        conn.close()
+        return jsonify(conversations)
+    except Exception as e:
+        logger.error(f"Error getting conversations: {e}")
+        return jsonify([])
+
+@app.route('/api/conversations/<conversation_id>')
+def get_conversation_messages(conversation_id):
+    """Get all messages for a specific conversation"""
+    try:
+        conn = sqlite3.connect('data/conversations.db')
+        cursor = conn.execute('''
+            SELECT user_input, agent_response, agents_used, timestamp
+            FROM conversations 
+            WHERE conversation_id = ? 
+            ORDER BY timestamp ASC
+        ''', (conversation_id,))
+        messages = []
+        for row in cursor.fetchall():
+            user_input, agent_response, agents_used, timestamp = row
+            messages.append({
+                'user_input': user_input,
+                'agent_response': agent_response,
+                'agents_used': agents_used,
+                'timestamp': timestamp
+            })
+        conn.close()
+        return jsonify(messages)
+    except Exception as e:
+        logger.error(f"Error getting conversation messages: {e}")
+        return jsonify([])
+
 @app.route('/stream_chat')
 def stream_chat():
     message = request.args.get('message', '')
@@ -1601,12 +1695,22 @@ def stream_chat():
                         
                         enhanced_prompt = f"""You are {agent['name']}. {agent['description']}. {agent['thinking_style']}
 
+CRITICAL INSTRUCTION: You are an ACTION-ORIENTED agent. When users ask you to create, build, or generate something, you MUST provide actual working code, files, or deliverables - NOT just instructions or explanations. Always default to building the actual thing requested.
+
 RECENT INTERNET SEARCH RESULTS:
 {search_results}
 
 USER REQUEST: {message}
 
-Please provide a comprehensive response using the most up-to-date information available. If the search results are relevant, incorporate them into your response. If not, provide the best response based on your expertise."""
+RESPONSE REQUIREMENTS:
+1. If the user asks for code, applications, visualizations, or any deliverables - PROVIDE THE ACTUAL WORKING CODE/FILES
+2. Write complete, runnable code with all necessary imports and dependencies
+3. Include sample data when needed
+4. Provide working examples that users can execute immediately
+5. Do NOT just give instructions - BUILD THE ACTUAL THING
+6. If you cannot build something due to limitations, clearly state what you CAN build and provide that instead
+
+Remember: You are a BUILDER, not just an advisor. Create actual working solutions."""
                         
                         # Get conversation history for context
                         conversation_history = get_conversation_history(conversation_id)
@@ -1689,6 +1793,10 @@ def auto_detect_agents(message):
         relevant_agents.append('documentation')
     if any(word in message_lower for word in ['api', 'integrate', 'connect', 'system']):
         relevant_agents.append('integration')
+    
+    # Special handling for visualization requests
+    if any(word in message_lower for word in ['visualization', 'visualize', 'chart', 'graph', 'map', 'plot', 'dashboard']):
+        relevant_agents = ['analysis', 'coding', 'creative']
     
     # Default to communication agent if no specific agents detected
     if not relevant_agents:
@@ -1781,7 +1889,7 @@ def get_cloud_model_response(model_name, prompt, conversation_history=None):
                 'https://api.openai.com/v1/chat/completions',
                 headers=headers,
                 json=data,
-                timeout=30
+                timeout=60
             )
             
             if response.status_code == 200:
@@ -1819,7 +1927,7 @@ def get_cloud_model_response(model_name, prompt, conversation_history=None):
                 'https://api.anthropic.com/v1/messages',
                 headers=headers,
                 json=data,
-                timeout=30
+                timeout=60
             )
             
             if response.status_code == 200:
@@ -1828,6 +1936,12 @@ def get_cloud_model_response(model_name, prompt, conversation_history=None):
             else:
                 return f"Anthropic API Error: {response.status_code} - {response.text}"
                 
+    except requests.exceptions.Timeout:
+        logger.error(f"Timeout error with cloud model {model_name}")
+        return f"Error: Request to {model_name} timed out. Please try again or check your internet connection."
+    except requests.exceptions.ConnectionError:
+        logger.error(f"Connection error with cloud model {model_name}")
+        return f"Error: Unable to connect to {model_name}. Please check your internet connection and API configuration."
     except Exception as e:
         logger.error(f"Error with cloud model {model_name}: {e}")
         return f"Error: Unable to connect to {model_name}. Please check your API configuration."
@@ -1842,7 +1956,7 @@ def get_ollama_response(model_name, prompt):
                 "prompt": prompt,
                 "stream": False
             },
-            timeout=30
+            timeout=60
         )
         
         if response.status_code == 200:
@@ -1851,6 +1965,12 @@ def get_ollama_response(model_name, prompt):
         else:
             return f"Ollama Error: {response.status_code} - {response.text}"
             
+    except requests.exceptions.Timeout:
+        logger.error(f"Timeout error with Ollama model {model_name}")
+        return f"Error: Request to Ollama model {model_name} timed out. Please try again."
+    except requests.exceptions.ConnectionError:
+        logger.error(f"Connection error with Ollama model {model_name}")
+        return f"Error: Unable to connect to Ollama model {model_name}. Please ensure Ollama is running on localhost:11434."
     except Exception as e:
         logger.error(f"Error with Ollama model {model_name}: {e}")
         return f"Error: Unable to connect to Ollama model {model_name}. Please ensure Ollama is running."
@@ -1888,7 +2008,7 @@ def stream_cloud_model_response(model_name, prompt, conversation_history, agent_
                 'https://api.openai.com/v1/chat/completions',
                 headers=headers,
                 json=data,
-                timeout=30,
+                timeout=60,
                 stream=True
             )
             
@@ -1943,7 +2063,7 @@ def stream_cloud_model_response(model_name, prompt, conversation_history, agent_
                 'https://api.anthropic.com/v1/messages',
                 headers=headers,
                 json=data,
-                timeout=30,
+                timeout=60,
                 stream=True
             )
             
@@ -1981,7 +2101,7 @@ def stream_ollama_response(model_name, prompt, agent_name):
                 "prompt": prompt,
                 "stream": True
             },
-            timeout=30,
+            timeout=60,
             stream=True
         )
         
@@ -2019,7 +2139,7 @@ def search_internet(query, max_results=5):
             'skip_disambig': '1'
         }
         
-        response = requests.get(search_url, params=params, timeout=10)
+        response = requests.get(search_url, params=params, timeout=30)
         
         if response.status_code == 200:
             try:
@@ -2054,6 +2174,12 @@ def search_internet(query, max_results=5):
         else:
             return f"Search completed for: {query}\n\nFor the most up-to-date information, I recommend checking recent sources on this topic."
             
+    except requests.exceptions.Timeout:
+        logger.error(f"Timeout error searching internet for: {query}")
+        return f"Search timeout for: {query}\n\nFor the most up-to-date information, I recommend checking recent sources on this topic."
+    except requests.exceptions.ConnectionError:
+        logger.error(f"Connection error searching internet for: {query}")
+        return f"Search connection error for: {query}\n\nFor the most up-to-date information, I recommend checking recent sources on this topic."
     except Exception as e:
         logger.error(f"Error searching internet: {e}")
         return f"Search completed for: {query}\n\nFor the most up-to-date information, I recommend checking recent sources on this topic."
