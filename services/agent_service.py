@@ -14,6 +14,7 @@ from models.agent import Agent, AgentExecution
 from models.conversation import Conversation
 from services.model_service import ModelService, ModelResponse
 from utils.security import SecurityUtils
+from agents.agent_config import AGENT_CONFIGS
 
 logger = logging.getLogger('juniorgpt.agent_service')
 
@@ -23,130 +24,17 @@ class AgentService:
     def __init__(self, model_service: ModelService):
         self.model_service = model_service
         self.security = SecurityUtils()
-        
-        # Define the 14 specialized agents
-        self.default_agents = {
-            "research": {
-                "name": "🔍 Research Agent",
-                "description": "Deep research and information gathering",
-                "model": "gpt-4o-mini",
-                "active": True,
-                "thinking_style": "I analyze information systematically, gathering facts and cross-referencing sources to provide comprehensive insights.",
-                "triggers": ["research", "find", "information", "data", "facts", "investigate", "study", "analyze"]
-            },
-            "coding": {
-                "name": "💻 Coding Agent", 
-                "description": "Software development and debugging",
-                "model": "claude-3-5-sonnet",
-                "active": True,
-                "thinking_style": "I think in code structures, considering best practices, patterns, and debugging approaches to solve programming challenges.",
-                "triggers": ["code", "programming", "debug", "script", "function", "algorithm", "software", "development"]
-            },
-            "analysis": {
-                "name": "📊 Analysis Agent",
-                "description": "Data analysis and insights",
-                "model": "gpt-4o-mini",
-                "active": True,
-                "thinking_style": "I examine data patterns, identify trends, and extract meaningful insights from complex information.",
-                "triggers": ["analyze", "data", "statistics", "trends", "patterns", "insights", "metrics"]
-            },
-            "writing": {
-                "name": "✍️ Writing Agent",
-                "description": "Content creation and editing",
-                "model": "claude-3-5-sonnet",
-                "active": True,
-                "thinking_style": "I craft clear, engaging content while maintaining proper structure, tone, and style for the intended audience.",
-                "triggers": ["write", "content", "article", "blog", "copy", "text", "document", "essay"]
-            },
-            "creative": {
-                "name": "🎨 Creative Agent",
-                "description": "Creative tasks and brainstorming",
-                "model": "gpt-4o",
-                "active": True,
-                "thinking_style": "I explore creative possibilities, generate original ideas, and approach problems with innovative thinking.",
-                "triggers": ["creative", "brainstorm", "ideas", "innovation", "design", "art", "story", "imagine"]
-            },
-            "planning": {
-                "name": "📋 Planning Agent",
-                "description": "Project planning and organization",
-                "model": "gpt-4o-mini",
-                "active": True,
-                "thinking_style": "I break down complex tasks into manageable steps, create timelines, and organize resources efficiently.",
-                "triggers": ["plan", "organize", "schedule", "project", "timeline", "strategy", "roadmap"]
-            },
-            "problem_solving": {
-                "name": "🧩 Problem Solver",
-                "description": "Complex problem analysis and solutions",
-                "model": "gpt-4o",
-                "active": True,
-                "thinking_style": "I approach problems systematically, breaking them down into components and evaluating multiple solution paths.",
-                "triggers": ["problem", "solve", "issue", "challenge", "troubleshoot", "fix", "solution"]
-            },
-            "communication": {
-                "name": "💬 Communication Agent",
-                "description": "Communication and interpersonal skills",
-                "model": "claude-3-5-sonnet",
-                "active": True,
-                "thinking_style": "I focus on clear, empathetic communication while considering audience needs and cultural context.",
-                "triggers": ["communicate", "message", "email", "presentation", "meeting", "discussion"]
-            },
-            "math": {
-                "name": "🔢 Math Agent",
-                "description": "Mathematical calculations and reasoning",
-                "model": "gpt-4o",
-                "active": True,
-                "thinking_style": "I approach mathematical problems step-by-step, showing work and explaining reasoning clearly.",
-                "triggers": ["math", "calculate", "equation", "formula", "statistics", "numbers", "computation"]
-            },
-            "learning": {
-                "name": "🎓 Learning Agent",
-                "description": "Educational content and explanations",
-                "model": "gpt-4o-mini",
-                "active": True,
-                "thinking_style": "I break down complex concepts into digestible parts, providing clear explanations and examples.",
-                "triggers": ["learn", "explain", "teach", "education", "tutorial", "lesson", "understand"]
-            },
-            "business": {
-                "name": "💼 Business Agent",
-                "description": "Business strategy and analysis",
-                "model": "gpt-4o",
-                "active": True,
-                "thinking_style": "I analyze business challenges through strategic frameworks, considering market dynamics and stakeholder interests.",
-                "triggers": ["business", "strategy", "market", "finance", "revenue", "profit", "customer"]
-            },
-            "health": {
-                "name": "🏥 Health Agent",
-                "description": "Health and wellness information",
-                "model": "gpt-4o-mini",
-                "active": True,
-                "thinking_style": "I provide health information while emphasizing the importance of professional medical advice.",
-                "triggers": ["health", "medical", "wellness", "fitness", "nutrition", "symptoms", "exercise"]
-            },
-            "legal": {
-                "name": "⚖️ Legal Agent",
-                "description": "Legal information and guidance",
-                "model": "claude-3-5-sonnet",
-                "active": True,
-                "thinking_style": "I provide legal information while clearly distinguishing between general guidance and professional legal advice.",
-                "triggers": ["legal", "law", "rights", "contract", "regulation", "compliance", "policy"]
-            },
-            "technical": {
-                "name": "🔧 Technical Agent",
-                "description": "Technical support and troubleshooting",
-                "model": "claude-3-5-sonnet",
-                "active": True,
-                "thinking_style": "I diagnose technical issues systematically and provide step-by-step solutions with clear explanations.",
-                "triggers": ["technical", "support", "troubleshoot", "system", "error", "configuration", "setup"]
-            }
-        }
-        
+
+        # Load agent definitions from central configuration
+        self.agent_configs = AGENT_CONFIGS
+
         self._initialize_agents()
     
     def _initialize_agents(self):
         """Initialize default agents in database if they don't exist"""
         try:
             with db.get_session() as session:
-                for agent_id, config in self.default_agents.items():
+                for agent_id, config in self.agent_configs.items():
                     existing_agent = Agent.get_by_agent_id(session, agent_id)
                     
                     if not existing_agent:
@@ -193,7 +81,7 @@ class AgentService:
         agent_scores = {}
         
         # Score agents based on keyword triggers
-        for agent_id, config in self.default_agents.items():
+        for agent_id, config in self.agent_configs.items():
             if not config.get("active", True):
                 continue
                 
@@ -267,7 +155,7 @@ class AgentService:
                 if isinstance(result, Exception):
                     logger.error(f"Agent {agent_id} failed: {result}")
                     thinking_traces[agent_id] = {
-                        "agent_name": self.default_agents[agent_id]["name"],
+                        "agent_name": self.agent_configs[agent_id]["name"],
                         "thinking": f"Error: {str(result)}",
                         "success": False
                     }
@@ -276,7 +164,7 @@ class AgentService:
                     execution_ids.append(execution_id)
                     agent_responses[agent_id] = response
                     thinking_traces[agent_id] = {
-                        "agent_name": self.default_agents[agent_id]["name"],
+                        "agent_name": self.agent_configs[agent_id]["name"],
                         "thinking": thinking,
                         "success": True
                     }
@@ -322,7 +210,7 @@ class AgentService:
         """Execute a single agent"""
         
         # Get agent configuration
-        agent_config = self.default_agents.get(agent_id)
+        agent_config = self.agent_configs.get(agent_id)
         if not agent_config:
             raise ValueError(f"Unknown agent: {agent_id}")
         
@@ -462,7 +350,7 @@ Provide a helpful, accurate, and detailed response appropriate to your specializ
         
         for agent_id in agent_ids:
             if agent_id in agent_responses:
-                agent_name = self.default_agents[agent_id]["name"]
+                agent_name = self.agent_configs[agent_id]["name"]
                 response = agent_responses[agent_id]
                 
                 combined += f"## {agent_name}\n\n{response}\n\n---\n\n"

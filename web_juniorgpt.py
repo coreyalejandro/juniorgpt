@@ -6,11 +6,10 @@ from datetime import datetime
 import logging
 import time
 import os
-from dotenv import load_dotenv
 from agents.agent_registry import get_registry, discover_agents
-
 from models import init_db
 from services import TeamService
+
 
 # Load environment variables from .env file
 load_dotenv()
@@ -59,107 +58,7 @@ def init_database():
     conn.commit()
     conn.close()
 
-# Define the 14 specialized agents
-AGENTS = {
-    "research": {
-        "name": "🔍 Research Agent",
-        "description": "Deep research and information gathering",
-        "model": "gpt-4o-mini",
-        "active": True,
-        "thinking_style": "I analyze information systematically, gathering facts and cross-referencing sources..."
-    },
-    "coding": {
-        "name": "💻 Coding Agent", 
-        "description": "Software development and debugging",
-        "model": "claude-3-5-sonnet-20241022",
-        "active": True,
-        "thinking_style": "I write actual working code, build complete applications, and create runnable solutions. I focus on delivering executable code, not just explanations."
-    },
-    "analysis": {
-        "name": "📊 Analysis Agent",
-        "description": "Data analysis and insights",
-        "model": "gpt-4o-mini",
-        "active": True,
-        "thinking_style": "I create actual data visualizations, build analysis scripts, and generate working charts and graphs. I deliver concrete analytical outputs, not just descriptions."
-    },
-    "writing": {
-        "name": "✍️ Writing Agent",
-        "description": "Content creation and editing",
-        "model": "claude-3-5-sonnet-20241022",
-        "active": True,
-        "thinking_style": "I craft clear, engaging content with proper structure and flow..."
-    },
-    "planning": {
-        "name": "📋 Planning Agent",
-        "description": "Project planning and strategy",
-        "model": "gpt-4o-mini",
-        "active": True,
-        "thinking_style": "I break down complex projects into manageable steps and create strategic roadmaps..."
-    },
-    "debugging": {
-        "name": "🐛 Debugging Agent",
-        "description": "Problem solving and troubleshooting",
-        "model": "claude-3-5-sonnet-20241022",
-        "active": True,
-        "thinking_style": "I systematically identify root causes and develop systematic solutions..."
-    },
-    "creative": {
-        "name": "🎨 Creative Agent",
-        "description": "Creative ideation and design",
-        "model": "gpt-4o-mini",
-        "active": True,
-        "thinking_style": "I build actual creative projects, generate visual designs, and create working prototypes. I deliver tangible creative outputs, not just concepts."
-    },
-    "learning": {
-        "name": "📚 Learning Agent",
-        "description": "Educational content and explanations",
-        "model": "claude-3-5-sonnet-20241022",
-        "active": True,
-        "thinking_style": "I structure information for optimal learning and understanding..."
-    },
-    "communication": {
-        "name": "💬 Communication Agent",
-        "description": "Clear communication and summaries",
-        "model": "gpt-4o-mini",
-        "active": True,
-        "thinking_style": "I create actual communication materials, build presentation tools, and generate working content. I deliver concrete communication outputs, not just advice."
-    },
-    "optimization": {
-        "name": "⚡ Optimization Agent",
-        "description": "Performance and efficiency improvements",
-        "model": "claude-3-5-sonnet-20241022",
-        "active": True,
-        "thinking_style": "I identify bottlenecks and optimize for maximum efficiency and performance..."
-    },
-    "security": {
-        "name": "🔒 Security Agent",
-        "description": "Security analysis and recommendations",
-        "model": "gpt-4o-mini",
-        "active": True,
-        "thinking_style": "I assess security risks and vulnerabilities with a security-first mindset..."
-    },
-    "testing": {
-        "name": "🧪 Testing Agent",
-        "description": "Testing strategies and validation",
-        "model": "claude-3-5-sonnet-20241022",
-        "active": True,
-        "thinking_style": "I design comprehensive test strategies to ensure quality and reliability..."
-    },
-    "documentation": {
-        "name": "📖 Documentation Agent",
-        "description": "Documentation and technical writing",
-        "model": "gpt-4o-mini",
-        "active": True,
-        "thinking_style": "I create clear, comprehensive documentation that serves user needs..."
-    },
-    "integration": {
-        "name": "🔗 Integration Agent",
-        "description": "System integration and APIs",
-        "model": "claude-3-5-sonnet-20241022",
-        "active": True,
-        "thinking_style": "I design seamless integrations and API architectures..."
-    }
-}
+AGENTS = AGENT_CONFIGS
 
 HTML_TEMPLATE = '''
 <!DOCTYPE html>
@@ -1100,19 +999,30 @@ HTML_TEMPLATE = '''
         let attachments = [];
         let mediaRecorder = null;
         let audioChunks = [];
-        let agents = ''' + json.dumps(AGENTS).replace('\\', '\\\\') + ''';
-        
+        let agents = {};
+
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
-            initializeAgents();
+            loadAgents();
             loadConversations();
             loadTeams();
             updateAutoModeToggle();
             initializeModelSelection();
         });
+
+        async function loadAgents() {
+            try {
+                const response = await fetch('/api/agents');
+                agents = await response.json();
+                initializeAgents();
+            } catch (err) {
+                console.error('Failed to load agents', err);
+            }
+        }
         
         function initializeAgents() {
             const agentGrid = document.getElementById('agentGrid');
+            agentGrid.innerHTML = '';
             Object.keys(agents).forEach(agentId => {
                 const agent = agents[agentId];
                 const agentCard = document.createElement('div');
@@ -1730,7 +1640,7 @@ HTML_TEMPLATE = '''
 def home():
     return render_template_string(HTML_TEMPLATE)
 
-
+  
 @app.route('/api/teams', methods=['GET', 'POST'])
 def manage_teams():
     """Create new teams or list existing ones"""
@@ -1763,6 +1673,7 @@ def team_detail(team_id):
 
     deleted = team_service.delete_team(team_id)
     return jsonify({'success': deleted})
+
 
 @app.route('/api/conversations')
 def get_conversations():
@@ -1985,11 +1896,13 @@ Remember: You are a BUILDER, not just an advisor. Create actual working solution
     return Response(generate(), mimetype='text/event-stream')
 
 def auto_detect_agents(message):
+
     """Auto-detect relevant agents using the global registry"""
     selected = agent_registry.auto_select_agents(message)
     if not selected:
         selected = ['communication']
     return selected
+  
 
 def save_conversation(user_input, response, conversation_id):
     """Save conversation to database"""
