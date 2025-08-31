@@ -7,6 +7,7 @@ import logging
 import time
 import os
 from dotenv import load_dotenv
+from agents.agent_config import AGENT_CONFIGS
 
 # Load environment variables from .env file
 load_dotenv()
@@ -35,107 +36,7 @@ def init_database():
     conn.commit()
     conn.close()
 
-# Define the 14 specialized agents
-AGENTS = {
-    "research": {
-        "name": "🔍 Research Agent",
-        "description": "Deep research and information gathering",
-        "model": "gpt-4o-mini",
-        "active": True,
-        "thinking_style": "I analyze information systematically, gathering facts and cross-referencing sources..."
-    },
-    "coding": {
-        "name": "💻 Coding Agent", 
-        "description": "Software development and debugging",
-        "model": "claude-3-5-sonnet-20241022",
-        "active": True,
-        "thinking_style": "I write actual working code, build complete applications, and create runnable solutions. I focus on delivering executable code, not just explanations."
-    },
-    "analysis": {
-        "name": "📊 Analysis Agent",
-        "description": "Data analysis and insights",
-        "model": "gpt-4o-mini",
-        "active": True,
-        "thinking_style": "I create actual data visualizations, build analysis scripts, and generate working charts and graphs. I deliver concrete analytical outputs, not just descriptions."
-    },
-    "writing": {
-        "name": "✍️ Writing Agent",
-        "description": "Content creation and editing",
-        "model": "claude-3-5-sonnet-20241022",
-        "active": True,
-        "thinking_style": "I craft clear, engaging content with proper structure and flow..."
-    },
-    "planning": {
-        "name": "📋 Planning Agent",
-        "description": "Project planning and strategy",
-        "model": "gpt-4o-mini",
-        "active": True,
-        "thinking_style": "I break down complex projects into manageable steps and create strategic roadmaps..."
-    },
-    "debugging": {
-        "name": "🐛 Debugging Agent",
-        "description": "Problem solving and troubleshooting",
-        "model": "claude-3-5-sonnet-20241022",
-        "active": True,
-        "thinking_style": "I systematically identify root causes and develop systematic solutions..."
-    },
-    "creative": {
-        "name": "🎨 Creative Agent",
-        "description": "Creative ideation and design",
-        "model": "gpt-4o-mini",
-        "active": True,
-        "thinking_style": "I build actual creative projects, generate visual designs, and create working prototypes. I deliver tangible creative outputs, not just concepts."
-    },
-    "learning": {
-        "name": "📚 Learning Agent",
-        "description": "Educational content and explanations",
-        "model": "claude-3-5-sonnet-20241022",
-        "active": True,
-        "thinking_style": "I structure information for optimal learning and understanding..."
-    },
-    "communication": {
-        "name": "💬 Communication Agent",
-        "description": "Clear communication and summaries",
-        "model": "gpt-4o-mini",
-        "active": True,
-        "thinking_style": "I create actual communication materials, build presentation tools, and generate working content. I deliver concrete communication outputs, not just advice."
-    },
-    "optimization": {
-        "name": "⚡ Optimization Agent",
-        "description": "Performance and efficiency improvements",
-        "model": "claude-3-5-sonnet-20241022",
-        "active": True,
-        "thinking_style": "I identify bottlenecks and optimize for maximum efficiency and performance..."
-    },
-    "security": {
-        "name": "🔒 Security Agent",
-        "description": "Security analysis and recommendations",
-        "model": "gpt-4o-mini",
-        "active": True,
-        "thinking_style": "I assess security risks and vulnerabilities with a security-first mindset..."
-    },
-    "testing": {
-        "name": "🧪 Testing Agent",
-        "description": "Testing strategies and validation",
-        "model": "claude-3-5-sonnet-20241022",
-        "active": True,
-        "thinking_style": "I design comprehensive test strategies to ensure quality and reliability..."
-    },
-    "documentation": {
-        "name": "📖 Documentation Agent",
-        "description": "Documentation and technical writing",
-        "model": "gpt-4o-mini",
-        "active": True,
-        "thinking_style": "I create clear, comprehensive documentation that serves user needs..."
-    },
-    "integration": {
-        "name": "🔗 Integration Agent",
-        "description": "System integration and APIs",
-        "model": "claude-3-5-sonnet-20241022",
-        "active": True,
-        "thinking_style": "I design seamless integrations and API architectures..."
-    }
-}
+AGENTS = AGENT_CONFIGS
 
 HTML_TEMPLATE = '''
 <!DOCTYPE html>
@@ -1034,18 +935,29 @@ HTML_TEMPLATE = '''
         let attachments = [];
         let mediaRecorder = null;
         let audioChunks = [];
-        let agents = ''' + json.dumps(AGENTS).replace('\\', '\\\\') + ''';
-        
+        let agents = {};
+
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
-            initializeAgents();
+            loadAgents();
             loadConversations();
             updateAutoModeToggle();
             initializeModelSelection();
         });
+
+        async function loadAgents() {
+            try {
+                const response = await fetch('/api/agents');
+                agents = await response.json();
+                initializeAgents();
+            } catch (err) {
+                console.error('Failed to load agents', err);
+            }
+        }
         
         function initializeAgents() {
             const agentGrid = document.getElementById('agentGrid');
+            agentGrid.innerHTML = '';
             Object.keys(agents).forEach(agentId => {
                 const agent = agents[agentId];
                 const agentCard = document.createElement('div');
@@ -1571,6 +1483,11 @@ HTML_TEMPLATE = '''
 def home():
     return render_template_string(HTML_TEMPLATE)
 
+@app.route('/api/agents')
+def get_agents():
+    """Return available agents"""
+    return jsonify(AGENTS)
+
 @app.route('/api/conversations')
 def get_conversations():
     """Get all conversations for the sidebar"""
@@ -1762,47 +1679,17 @@ Remember: You are a BUILDER, not just an advisor. Create actual working solution
 def auto_detect_agents(message):
     """Auto-detect which agents are relevant to the user's request"""
     message_lower = message.lower()
-    relevant_agents = []
-    
-    # Simple keyword-based detection (in a real system, this would use AI)
-    if any(word in message_lower for word in ['code', 'program', 'debug', 'software', 'function']):
-        relevant_agents.append('coding')
-    if any(word in message_lower for word in ['research', 'find', 'information', 'data']):
-        relevant_agents.append('research')
-    if any(word in message_lower for word in ['analyze', 'analysis', 'insights', 'trends']):
-        relevant_agents.append('analysis')
-    if any(word in message_lower for word in ['write', 'content', 'document', 'article']):
-        relevant_agents.append('writing')
-    if any(word in message_lower for word in ['plan', 'strategy', 'project', 'organize']):
-        relevant_agents.append('planning')
-    if any(word in message_lower for word in ['problem', 'error', 'fix', 'issue']):
-        relevant_agents.append('debugging')
-    if any(word in message_lower for word in ['creative', 'design', 'idea', 'art']):
-        relevant_agents.append('creative')
-    if any(word in message_lower for word in ['learn', 'explain', 'teach', 'education']):
-        relevant_agents.append('learning')
-    if any(word in message_lower for word in ['communicate', 'summarize', 'explain']):
-        relevant_agents.append('communication')
-    if any(word in message_lower for word in ['optimize', 'improve', 'performance', 'efficient']):
-        relevant_agents.append('optimization')
-    if any(word in message_lower for word in ['security', 'secure', 'vulnerability']):
-        relevant_agents.append('security')
-    if any(word in message_lower for word in ['test', 'testing', 'validate']):
-        relevant_agents.append('testing')
-    if any(word in message_lower for word in ['document', 'docs', 'manual']):
-        relevant_agents.append('documentation')
-    if any(word in message_lower for word in ['api', 'integrate', 'connect', 'system']):
-        relevant_agents.append('integration')
-    
-    # Special handling for visualization requests
-    if any(word in message_lower for word in ['visualization', 'visualize', 'chart', 'graph', 'map', 'plot', 'dashboard']):
-        relevant_agents = ['analysis', 'coding', 'creative']
-    
-    # Default to communication agent if no specific agents detected
-    if not relevant_agents:
-        relevant_agents = ['communication']
-    
-    return relevant_agents
+    detected = []
+
+    for agent_id, config in AGENTS.items():
+        triggers = config.get('triggers', [])
+        if any(trigger in message_lower for trigger in triggers):
+            detected.append(agent_id)
+
+    if not detected and 'communication' in AGENTS:
+        detected.append('communication')
+
+    return detected
 
 def save_conversation(user_input, response, conversation_id):
     """Save conversation to database"""
