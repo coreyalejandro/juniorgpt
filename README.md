@@ -382,4 +382,4 @@ curl http://localhost:7860/api/health
 tail -f logs/juniorgpt.log
 ```
 
-# Built with ❤️ for secure, scalable AI assistance
+## Built with ❤️ for secure, scalable AI assistance
